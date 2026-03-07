@@ -1,51 +1,61 @@
 ﻿import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:app_links/app_links.dart';
 import 'dart:async';
-import 'controllers/auth_controller.dart';
-import 'controllers/scan_controller.dart';
-import 'controllers/settings_controller.dart';
-import 'controllers/profile_controller.dart';
-import 'controllers/report_controller.dart';
-import 'services/notification_service.dart';
-import 'services/api_service.dart'; // استيراد API service
-import 'views/splash_screen.dart';
-import 'views/auth/login_screen.dart';
-import 'views/auth/register_screen.dart';
-import 'views/main/home_screen.dart';
-import 'views/main/main_screen.dart';
-import 'views/scan/result_screen.dart';
-import 'views/scan/history_screen.dart';
-import 'views/profile/profile_screen.dart';
-import 'views/profile/edit_profile_screen.dart';
-import 'views/report/report_screen.dart';
-import 'views/settings/settings_screen.dart';
-import 'theme/app_theme.dart';
-import 'models/scan_result.dart';
 
-void main() async {
+import 'package:safeclik/core/di/di.dart';
+import 'package:safeclik/core/utils/notification_service.dart';
+import 'package:safeclik/core/theme/app_theme.dart';
+
+import 'package:safeclik/core/network/api_service.dart';
+import 'package:safeclik/features/auth/presentation/providers/auth_controller.dart';
+import 'package:safeclik/features/settings/presentation/providers/settings_controller.dart';
+import 'package:safeclik/features/scan/presentation/controllers/scan_notifier.dart';
+import 'package:safeclik/features/scan/data/models/scan_result.dart';
+
+import 'package:safeclik/features/main/presentation/pages/splash_screen.dart';
+import 'package:safeclik/features/auth/presentation/pages/login_screen.dart';
+import 'package:safeclik/features/auth/presentation/pages/register_screen.dart';
+import 'package:safeclik/features/main/presentation/pages/home_screen.dart';
+import 'package:safeclik/features/main/presentation/pages/main_screen.dart';
+import 'package:safeclik/features/scan/presentation/pages/result_screen.dart';
+import 'package:safeclik/features/scan/presentation/pages/history_screen.dart';
+import 'package:safeclik/features/profile/presentation/pages/profile_screen.dart';
+import 'package:safeclik/features/profile/presentation/pages/edit_profile_screen.dart';
+import 'package:safeclik/features/report/presentation/pages/report_screen.dart';
+import 'package:safeclik/features/settings/presentation/pages/settings_screen.dart';
+
+Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  
-  // تهيئة API service
+
+  // Phase 1 Fix #1: Load environment variables FIRST before any other code.
+  await dotenv.load(fileName: '.env');
+
+  // Initialize dependency injection AFTER dotenv so ApiService reads env vars.
+  await initDI();
+
+  // Phase 6: Initialize Smart API Discovery
   await ApiService.initialize();
-  
-  // تهيئة الإشعارات
-  await NotificationService().initialize();
-  
-  runApp(const MyApp());
+
+  // Initialize Notifications
+  await sl<NotificationService>().initialize();
+
+  runApp(const ProviderScope(child: MyApp()));
 }
 
-class MyApp extends StatefulWidget {
+class MyApp extends ConsumerStatefulWidget {
   const MyApp({super.key});
 
   @override
-  State<MyApp> createState() => _MyAppState();
+  ConsumerState<MyApp> createState() => _MyAppState();
 }
 
-class _MyAppState extends State<MyApp> {
+class _MyAppState extends ConsumerState<MyApp> {
   final AppLinks _appLinks = AppLinks();
   StreamSubscription<Uri>? _linkSubscription;
   String? _pendingLink;
+  bool _processingDeepLink = false;
 
   @override
   void initState() {
@@ -55,61 +65,56 @@ class _MyAppState extends State<MyApp> {
 
   Future<void> _initDeepLinks() async {
     try {
-      // معالجة الرابط الذي فتح به التطبيق
       final initialLink = await _appLinks.getInitialAppLink();
       if (initialLink != null) {
-        print('📱 تم فتح التطبيق عبر رابط: $initialLink');
+        debugPrint('📱 تم فتح التطبيق عبر رابط: $initialLink');
         _pendingLink = initialLink.toString();
       }
 
-      // الاستماع للروابط أثناء تشغيل التطبيق
       _linkSubscription = _appLinks.allUriLinkStream.listen((Uri? uri) {
         if (uri != null) {
-          print('📱 تم استقبال رابط: $uri');
+          debugPrint('📱 تم استقبال رابط: $uri');
+          // Update _pendingLink without calling setState to avoid MaterialApp rebuild
           _pendingLink = uri.toString();
           if (mounted) setState(() {});
         }
       });
     } catch (e) {
-      print('❌ خطأ في الروابط: $e');
+      debugPrint('❌ خطأ في الروابط: $e');
     }
   }
 
   Future<void> _handlePendingLink(BuildContext context) async {
-    if (_pendingLink == null) return;
-    
+    if (_pendingLink == null || _processingDeepLink) return;
+
     final link = _pendingLink!;
+    final authState = ref.read(authProvider);
+    if (!authState.isAuthenticated) return;
+
+    _processingDeepLink = true;
     _pendingLink = null;
-    
-    // التأكد من تسجيل الدخول
-    final authController = Provider.of<AuthController>(context, listen: false);
-    if (!authController.isAuthenticated) {
-      // إذا لم يكن مسجل دخول، انتظر حتى يسجل ثم افحص الرابط
+
+    if (!context.mounted) {
+      _processingDeepLink = false;
       return;
     }
-    
-    final scanController = Provider.of<ScanController>(context, listen: false);
-    
-    // عرض مؤشر تحميل
-    if (!context.mounted) return;
-    
+
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (context) => const Center(
-        child: CircularProgressIndicator(),
-      ),
+      builder: (context) => const Center(child: CircularProgressIndicator()),
     );
-    
-    final result = await scanController.scanLink(link);
-    
-    if (!context.mounted) return;
-    
-    // إغلاق مؤشر التحميل
+
+    final result = await ref.read(scanNotifierProvider.notifier).scanLink(link);
+
+    if (!context.mounted) {
+      _processingDeepLink = false;
+      return;
+    }
+
     Navigator.pop(context);
-    
+
     if (result != null) {
-      // الانتقال لصفحة النتيجة
       Navigator.push(
         context,
         MaterialPageRoute(
@@ -117,14 +122,16 @@ class _MyAppState extends State<MyApp> {
         ),
       );
     } else {
-      // عرض خطأ
+      final errorMsg = ref.read(scanNotifierProvider).lastError ?? 'فشل فحص الرابط';
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(scanController.lastError ?? 'فشل فحص الرابط'),
+          content: Text(errorMsg),
           backgroundColor: Theme.of(context).colorScheme.error,
         ),
       );
     }
+
+    _processingDeepLink = false;
   }
 
   @override
@@ -135,63 +142,63 @@ class _MyAppState extends State<MyApp> {
 
   @override
   Widget build(BuildContext context) {
-    return MultiProvider(
-      providers: [
-        ChangeNotifierProvider(create: (_) => AuthController()),
-        ChangeNotifierProvider(create: (_) => ScanController()),
-        ChangeNotifierProvider(create: (_) => SettingsController()),
-        ChangeNotifierProvider(create: (_) => ProfileController()),
-        ChangeNotifierProvider(create: (_) => ReportController()),
-      ],
-      child: Consumer<SettingsController>(
-        builder: (context, settingsController, child) {
-          return MaterialApp(
-            title: 'SafeClik',
-            debugShowCheckedModeBanner: false,
-            theme: AppTheme.lightTheme,
-            darkTheme: AppTheme.darkTheme,
-            themeMode: settingsController.settings.darkMode ? ThemeMode.dark : ThemeMode.light,
-            home: Builder(
-              builder: (context) => Consumer<AuthController>(
-                builder: (context, authController, child) {
-                  if (authController.isLoading) {
-                    return const SplashScreen();
-                  }
-                  
-                  // معالجة الرابط المعلق بعد تحميل الصفحة
-                  WidgetsBinding.instance.addPostFrameCallback((_) {
-                    _handlePendingLink(context);
-                  });
-                  
-                  return authController.isAuthenticated 
-                      ? const HomeScreen() 
-                      : const LoginScreen();
-                },
-              ),
-            ),
-            routes: {
-              '/login': (context) => const LoginScreen(),
-              '/register': (context) => const RegisterScreen(),
-              '/home': (context) => const HomeScreen(),
-              '/main': (context) => const MainScreen(),
-              '/history': (context) => const HistoryScreen(),
-              '/report': (context) => const ReportScreen(),
-              '/profile': (context) => const ProfileScreen(),
-              '/edit_profile': (context) => const EditProfileScreen(),
-              '/settings': (context) => const SettingsScreen(),
-            },
-            onGenerateRoute: (settings) {
-              if (settings.name == '/result') {
-                final scanResult = settings.arguments as ScanResult;
-                return MaterialPageRoute(
-                  builder: (context) => ResultScreen(scanResult: scanResult),
-                );
-              }
-              return null;
-            },
-          );
+    final settingsAsyncValue = ref.watch(settingsProvider);
+    final isDarkMode = settingsAsyncValue.value?.darkMode ?? false;
+
+    // Phase 1 Fix #3: Read reactive AuthState — not notifier fields.
+    final authState = ref.watch(authProvider);
+
+    return MaterialApp(
+      title: 'SafeClik',
+      debugShowCheckedModeBanner: false,
+      theme: AppTheme.lightTheme,
+      darkTheme: AppTheme.darkTheme,
+      themeMode: isDarkMode ? ThemeMode.dark : ThemeMode.light,
+      home: Builder(
+        builder: (context) {
+          // isInitializing is now part of state → UI rebuilds correctly
+          if (authState.isInitializing) {
+            return const SplashScreen();
+          }
+
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            _handlePendingLink(context);
+          });
+
+          return authState.isAuthenticated
+              ? const HomeScreen()
+              : const LoginScreen();
         },
       ),
+      routes: {
+        '/login': (context) => const LoginScreen(),
+        '/register': (context) => const RegisterScreen(),
+        '/home': (context) => const HomeScreen(),
+        '/main': (context) => const MainScreen(),
+        '/history': (context) => const HistoryScreen(),
+        '/report': (context) => const ReportScreen(),
+        '/profile': (context) => const ProfileScreen(),
+        '/edit_profile': (context) => const EditProfileScreen(),
+        '/settings': (context) => const SettingsScreen(),
+      },
+      onGenerateRoute: (settings) {
+        if (settings.name == '/result') {
+          // Phase 1 Fix #2: Safe nullable cast — no more runtime TypeError
+          final scanResult = settings.arguments as ScanResult?;
+          if (scanResult == null) {
+            return MaterialPageRoute(
+              builder: (context) => Scaffold(
+                appBar: AppBar(title: const Text('خطأ')),
+                body: const Center(child: Text('تعذر تحميل نتيجة الفحص')),
+              ),
+            );
+          }
+          return MaterialPageRoute(
+            builder: (context) => ResultScreen(scanResult: scanResult),
+          );
+        }
+        return null;
+      },
     );
   }
 }

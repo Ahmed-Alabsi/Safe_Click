@@ -13,7 +13,8 @@ dependencies:
     
   app_links: ^3.5.1  # المكتبة الصحيحة
 
-  provider: ^6.1.1
+  get_it: ^7.7.0
+  flutter_riverpod: ^2.5.1
 
 
   flutter_dotenv: ^5.1.0
@@ -22,7 +23,7 @@ dependencies:
   path_provider: ^2.1.1
 
   # للشبكات والـ API
-  http: ^1.1.2
+  dio: ^5.4.0
 
   # للصور - إصدار محدث
   image_picker: ^1.0.7
@@ -39,6 +40,11 @@ dependencies:
 
   # للأمان والتشفير
   crypto: ^3.0.3
+  flutter_secure_storage: ^9.2.2   # Phase 2: مخزن JWT آمن بدلاً من SharedPreferences
+
+  # للـ SQLite Cache المحلي
+  sqflite: ^2.3.3
+  path: ^1.9.0
 
 
 
@@ -77,9 +83,10 @@ flutter:
   uses-material-design: true
 
   # To add assets to your application, add an assets section, like this:
-  # assets:
-  #   - images/a_dot_burr.jpeg
-  #   - images/a_dot_ham.jpeg
+  assets:
+    - .env
+  # - assets/images/
+    - assets/icon/
 
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/to/resolution-aware-images
