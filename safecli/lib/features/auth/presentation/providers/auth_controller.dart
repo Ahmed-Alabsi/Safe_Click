@@ -5,7 +5,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:safeclik/features/auth/data/models/user_model.dart';
 import 'package:safeclik/features/auth/presentation/providers/auth_state.dart';
-import 'package:safeclik/core/network/api_service.dart';
+import 'package:safeclik/core/network/api_client.dart';
+import 'package:safeclik/core/network/auth_api.dart';
 import 'package:safeclik/core/di/di.dart';
 
 export 'auth_state.dart';
@@ -19,13 +20,13 @@ final _secureStorage = const FlutterSecureStorage(
 );
 
 final authProvider = StateNotifierProvider<AuthNotifier, AuthState>(
-  (ref) => AuthNotifier(),
+  (ref) => AuthNotifier(sl<AuthApi>()),
 );
 
 class AuthNotifier extends StateNotifier<AuthState> {
-  final ApiService _apiService = sl<ApiService>();
+  final AuthApi _authApi;
 
-  AuthNotifier() : super(const AuthState(isInitializing: true)) {
+  AuthNotifier(this._authApi) : super(const AuthState(isInitializing: true)) {
     _loadSavedUser();
   }
 
@@ -35,7 +36,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
     try {
       final token = await _secureStorage.read(key: _kAccessToken);
       if (token != null) {
-        final response = await _apiService.getProfile();
+        final response = await _authApi.getProfile();
         if (response['success'] == true && response.containsKey('user')) {
           state = state.copyWith(
             isInitializing: false,
@@ -55,6 +56,9 @@ class AuthNotifier extends StateNotifier<AuthState> {
   Future<void> _clearTokens() async {
     await _secureStorage.delete(key: _kAccessToken);
     await _secureStorage.delete(key: _kRefreshToken);
+    // 🔐 Fix: clear in-memory token cache in ApiClient to prevent
+    // stale token being sent after logout (token cache leak).
+    sl<ApiClient>().cacheToken(null);
     state = state.copyWith(clearUser: true, clearError: true, isInitializing: false);
   }
 
@@ -67,15 +71,15 @@ class AuthNotifier extends StateNotifier<AuthState> {
     state = state.copyWith(isLoading: true, clearError: true);
 
     try {
-      final response = await _apiService.login(email: email, password: password);
+      final response = await _authApi.login(email: email, password: password);
       if (response['success'] == true) {
         // Persist tokens in secure storage
         final tokens = response['tokens'];
         if (tokens != null) {
           await _secureStorage.write(key: _kAccessToken, value: tokens['access']);
           await _secureStorage.write(key: _kRefreshToken, value: tokens['refresh']);
-          // Also push to ApiService in-memory cache
-          sl<ApiService>().cacheToken(tokens['access']);
+          // Also push to ApiClient in-memory cache
+          // _authApi already caches the token internally!
         }
         final user = UserModel.fromJson(response['user']);
         state = AuthState(isInitializing: false, isLoading: false, user: user);
@@ -118,7 +122,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
         return false;
       }
 
-      final response = await _apiService.register(
+      final response = await _authApi.register(
         name: name,
         email: email,
         password: password,
@@ -146,7 +150,8 @@ class AuthNotifier extends StateNotifier<AuthState> {
       state = AuthState(isInitializing: false, isLoading: false, error: 'تعذر الاتصال بالخادم');
     } on TimeoutException {
       state = AuthState(isInitializing: false, isLoading: false, error: 'انتهت مهلة الاتصال بالخادم');
-    } catch (_) {
+    } catch (e) {
+      debugPrint('Register exception: $e');
       state = AuthState(isInitializing: false, isLoading: false, error: 'حدث خطأ غير متوقع');
     }
     return false;
@@ -154,62 +159,64 @@ class AuthNotifier extends StateNotifier<AuthState> {
 
   Future<void> logout() async {
     try {
-      await _apiService.logout().catchError((_) => <String, dynamic>{});
+      await _authApi.logout().catchError((_) => <String, dynamic>{});
     } finally {
       await _clearTokens();
-      sl<ApiService>().cacheToken(null);
     }
   }
 
   Future<bool> resetPassword(String email) async {
-    state = state.copyWith(isInitializing: true, clearError: true);
+    state = state.copyWith(isLoading: true, clearError: true);
     try {
-      final response = await _apiService.forgotPassword(email);
-      state = state.copyWith(isInitializing: false);
+      final response = await _authApi.forgotPassword(email);
+      state = state.copyWith(isLoading: false);
       return response['success'] == true;
-    } catch (_) {
-      state = AuthState(isInitializing: false, error: 'حدث خطأ في الاتصال بالخادم');
+    } catch (e) {
+      debugPrint('ResetPassword exception: $e');
+      state = state.copyWith(isLoading: false, error: 'حدث خطأ في الاتصال بالخادم');
       return false;
     }
   }
 
   Future<bool> updateProfile({String? name, String? email}) async {
-    state = state.copyWith(isInitializing: true, clearError: true);
+    state = state.copyWith(isLoading: true, clearError: true);
     try {
-      final response = await _apiService.updateProfile(name: name, email: email);
+      final response = await _authApi.updateProfile(name: name, email: email);
       if (response['success'] == true && response.containsKey('user')) {
-        state = AuthState(
-          isInitializing: false,
+        state = state.copyWith(
+          isLoading: false,
           user: UserModel.fromJson(response['user']),
         );
         return true;
       }
-      state = AuthState(
-        isInitializing: false,
+      state = state.copyWith(
+        isLoading: false,
         error: response['message'] ?? 'فشل تحديث البيانات',
       );
       return false;
-    } catch (_) {
-      state = AuthState(isInitializing: false, error: 'حدث خطأ في الاتصال');
+    } catch (e) {
+      debugPrint('UpdateProfile exception: $e');
+      state = state.copyWith(isLoading: false, error: 'حدث خطأ في الاتصال');
       return false;
     }
   }
 
   Future<bool> updateProfileImage(String imagePath) async {
-    state = state.copyWith(isInitializing: true, clearError: true);
+    state = state.copyWith(isLoading: true, clearError: true);
     try {
-      final response = await _apiService.updateProfileImage(imagePath);
+      final response = await _authApi.updateProfileImage(imagePath);
       if (response['success'] == true && response.containsKey('user')) {
-        state = AuthState(
-          isInitializing: false,
+        state = state.copyWith(
+          isLoading: false,
           user: UserModel.fromJson(response['user']),
         );
         return true;
       }
-      state = AuthState(isInitializing: false, error: 'فشل تحديث الصورة');
+      state = state.copyWith(isLoading: false, error: 'فشل تحديث الصورة');
       return false;
-    } catch (_) {
-      state = AuthState(isInitializing: false, error: 'حدث خطأ في الاتصال');
+    } catch (e) {
+      debugPrint('UpdateProfileImage exception: $e');
+      state = state.copyWith(isLoading: false, error: 'حدث خطأ في الاتصال');
       return false;
     }
   }
@@ -219,19 +226,20 @@ class AuthNotifier extends StateNotifier<AuthState> {
     required String newPassword,
     required String newPasswordConfirm,
   }) async {
-    state = state.copyWith(isInitializing: true, clearError: true);
+    state = state.copyWith(isLoading: true, clearError: true);
     try {
-      final response = await _apiService.changePassword(
+      final response = await _authApi.changePassword(
         oldPassword: oldPassword,
         newPassword: newPassword,
         newPasswordConfirm: newPasswordConfirm,
       );
-      state = state.copyWith(isInitializing: false);
+      state = state.copyWith(isLoading: false);
       if (response['success'] == true) return true;
       state = state.copyWith(error: response['message'] ?? 'فشل تغيير كلمة المرور');
       return false;
-    } catch (_) {
-      state = AuthState(isInitializing: false, error: 'حدث خطأ في الاتصال بالخادم');
+    } catch (e) {
+      debugPrint('ChangePassword exception: $e');
+      state = state.copyWith(isLoading: false, error: 'حدث خطأ في الاتصال بالخادم');
       return false;
     }
   }

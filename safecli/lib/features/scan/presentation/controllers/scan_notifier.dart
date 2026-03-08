@@ -13,24 +13,42 @@ import 'package:safeclik/features/scan/domain/usecases/get_scan_history_usecase.
 import 'package:safeclik/features/scan/domain/usecases/save_history_usecase.dart';
 import 'package:safeclik/features/scan/domain/usecases/scan_link_usecase.dart';
 import 'package:safeclik/core/di/di.dart';
-import 'package:safeclik/core/utils/scan_cache_service.dart';
 import 'package:safeclik/features/scan/data/repositories/scan_repository_impl.dart';
 import 'scan_state.dart';
 
 final scanNotifierProvider = StateNotifierProvider<ScanNotifier, ScanState>(
-  (ref) => ScanNotifier(),
+  (ref) => ScanNotifier(
+    scanLinkUseCase: sl<ScanLinkUseCase>(),
+    getHistoryUseCase: sl<GetScanHistoryUseCase>(),
+    deleteUseCase: sl<DeleteScanUseCase>(),
+    clearUseCase: sl<ClearHistoryUseCase>(),
+    saveHistoryUseCase: sl<SaveHistoryUseCase>(),
+    repo: sl<ScanRepositoryImpl>(),
+  ),
 );
 
 class ScanNotifier extends StateNotifier<ScanState> {
-  final ScanLinkUseCase _scanLinkUseCase = sl<ScanLinkUseCase>();
-  final GetScanHistoryUseCase _getHistoryUseCase = sl<GetScanHistoryUseCase>();
-  final DeleteScanUseCase _deleteUseCase = sl<DeleteScanUseCase>(); // سنستخدمه للـ soft delete
-  final ClearHistoryUseCase _clearUseCase = sl<ClearHistoryUseCase>();
-  final SaveHistoryUseCase _saveHistoryUseCase = sl<SaveHistoryUseCase>();
-  final ScanCacheService _scanCache = sl<ScanCacheService>();
+  final ScanLinkUseCase _scanLinkUseCase;
+  final GetScanHistoryUseCase _getHistoryUseCase;
+  final DeleteScanUseCase _deleteUseCase;
+  final ClearHistoryUseCase _clearUseCase;
+  final SaveHistoryUseCase _saveHistoryUseCase;
+  final ScanRepositoryImpl _repo;
 
-  ScanNotifier() : super(const ScanState()) {
-    _scanCache.purgeExpired();
+  ScanNotifier({
+    required ScanLinkUseCase scanLinkUseCase,
+    required GetScanHistoryUseCase getHistoryUseCase,
+    required DeleteScanUseCase deleteUseCase,
+    required ClearHistoryUseCase clearUseCase,
+    required SaveHistoryUseCase saveHistoryUseCase,
+    required ScanRepositoryImpl repo,
+  })  : _scanLinkUseCase = scanLinkUseCase,
+        _getHistoryUseCase = getHistoryUseCase,
+        _deleteUseCase = deleteUseCase,
+        _clearUseCase = clearUseCase,
+        _saveHistoryUseCase = saveHistoryUseCase,
+        _repo = repo,
+        super(const ScanState()) {
     _loadHistory();
   }
 
@@ -86,8 +104,7 @@ class ScanNotifier extends StateNotifier<ScanState> {
 
   Future<void> _syncHistoryFromServer() async {
     try {
-      final repo = sl<ScanRepositoryImpl>();
-      final entities = await repo.syncHistoryFromRemote();
+      final entities = await _repo.syncHistoryFromRemote();
       if (!mounted) return;
       final results = entities.map(_toResult).toList();
       
@@ -258,52 +275,6 @@ Future<void> softDeleteScanResult(String id) async {
     }
   }
   
-  Future<void> deleteScanResult(String id) async {
-    debugPrint('🗑️ [Delete] Starting delete for ID: $id');
-    state = state.copyWith(isLoading: true);
-    
-    try {
-      final success = await _deleteUseCase(id);
-      debugPrint('🗑️ [Delete] UseCase result: $success');
-      
-      // حذف محلي دائماً
-      final newHistory = state.scanHistory.where((s) => s.id != id).toList();
-      
-      // حفظ التغييرات
-      await _saveHistoryUseCase(newHistory.map(_toEntity).toList());
-      
-      state = state.copyWith(
-        scanHistory: newHistory,
-        dangerousScans: _countDangerous(newHistory),
-        isLoading: false,
-      );
-      
-      if (success) {
-        debugPrint('✅ [Delete] Successfully deleted ID: $id');
-      } else {
-        debugPrint('✅ [Delete] Local delete only for ID: $id');
-      }
-    } catch (e) {
-      debugPrint('🔴 [Delete] Error: $e');
-      
-      // محاولة الحذف المحلي كحل أخير
-      try {
-        final newHistory = state.scanHistory.where((s) => s.id != id).toList();
-        await _saveHistoryUseCase(newHistory.map(_toEntity).toList());
-        state = state.copyWith(
-          scanHistory: newHistory,
-          dangerousScans: _countDangerous(newHistory),
-          isLoading: false,
-        );
-      } catch (localError) {
-        state = state.copyWith(
-          isLoading: false,
-          lastError: 'فشل حذف الفحص: $e',
-        );
-      }
-    }
-  }
-
   void clearError() => state = state.copyWith(lastError: null);
 
   void reset() {
@@ -407,3 +378,38 @@ Future<void> softDeleteScanResult(String id) async {
     }).toList();
   }
 }
+
+// ── Search & Filter Providers ──
+final historyFilterProvider = StateProvider<int>((ref) => 0); // 0: All, 1: Safe, 2: Suspicious, 3: Dangerous
+final historySearchProvider = StateProvider<String>((ref) => '');
+
+final filteredHistoryProvider = Provider<List<ScanResult>>((ref) {
+  final history = ref.watch(scanNotifierProvider).scanHistory;
+  final filter = ref.watch(historyFilterProvider);
+  final search = ref.watch(historySearchProvider).toLowerCase();
+
+  List<ScanResult> tabFiltered;
+  switch (filter) {
+    case 1:
+      tabFiltered = history.where((s) => s.safe == true).toList();
+      break;
+    case 2:
+      tabFiltered = history.where((s) => s.safe == null).toList();
+      break;
+    case 3:
+      tabFiltered = history.where((s) => s.safe == false).toList();
+      break;
+    default:
+      tabFiltered = history;
+  }
+
+  if (search.isNotEmpty) {
+    return tabFiltered.where((scan) {
+      return scan.link.toLowerCase().contains(search) ||
+          scan.message.toLowerCase().contains(search) ||
+          scan.details.any((d) => d.toLowerCase().contains(search));
+    }).toList();
+  }
+  
+  return tabFiltered;
+});

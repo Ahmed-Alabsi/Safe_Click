@@ -2,7 +2,6 @@
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:safeclik/core/utils/scan_cache_service.dart';
-import 'package:safeclik/core/utils/local_storage_service.dart';
 import 'package:safeclik/features/scan/data/models/scan_result.dart';
 import 'package:safeclik/features/scan/data/datasources/remote_scan_datasource.dart';
 import '../../domain/entities/scan_entity.dart';
@@ -11,78 +10,32 @@ import '../../domain/repositories/scan_repository.dart';
 class ScanRepositoryImpl implements ScanRepository {
   final RemoteScanDataSource _remote;
   final ScanCacheService _cache;
-  final LocalStorageService _localStorage;
-
-  // مفتاح لتخزين IDs المحذوفة محلياً
-  static const String _deletedIdsKey = 'soft_deleted_scan_ids';
 
   ScanRepositoryImpl({
     required RemoteScanDataSource remote,
     required ScanCacheService cache,
-    required LocalStorageService localStorage,
   })  : _remote = remote,
-        _cache = cache,
-        _localStorage = localStorage;
+        _cache = cache;
 
-  ScanEntity _toEntity(ScanResult r) => ScanEntity(
-        id: r.id,
-        link: r.link,
-        safe: r.safe,
-        score: r.score,
-        message: r.message,
-        details: r.details,
-        timestamp: r.timestamp,
-        rawData: r.rawData,
-        responseTime: r.responseTime,
-        ipAddress: r.ipAddress,
-        domain: r.domain,
-        threatsCount: r.threatsCount,
+  ScanEntity _toEntity(ScanResult model) => model.toEntity();
+
+  ScanResult _toModel(ScanEntity entity) => ScanResult(
+        id: entity.id,
+        link: entity.link,
+        safe: entity.safe,
+        score: entity.score,
+        message: entity.message,
+        details: entity.details,
+        timestamp: entity.timestamp,
+        rawData: entity.rawData,
+        responseTime: entity.responseTime,
+        ipAddress: entity.ipAddress,
+        domain: entity.domain,
+        threatsCount: entity.threatsCount,
+        source: entity.source,
       );
 
-  ScanResult _toModel(ScanEntity e) => ScanResult(
-        id: e.id,
-        link: e.link,
-        safe: e.safe,
-        score: e.score,
-        message: e.message,
-        details: e.details,
-        timestamp: e.timestamp,
-        rawData: e.rawData,
-        responseTime: e.responseTime,
-        ipAddress: e.ipAddress,
-        domain: e.domain,
-        threatsCount: e.threatsCount,
-      );
-
-  /// الحصول على قائمة IDs المحذوفة
-  Future<Set<String>> _getDeletedIds() async {
-    try {
-      final stored = await _localStorage.getString(_deletedIdsKey);
-      if (stored != null && stored.isNotEmpty) {
-        return Set.from(jsonDecode(stored));
-      }
-    } catch (e) {
-      debugPrint('⚠️ Error reading deleted IDs: $e');
-    }
-    return {};
-  }
-
-  /// حفظ قائمة IDs المحذوفة
-  Future<void> _saveDeletedIds(Set<String> ids) async {
-    try {
-      await _localStorage.setString(_deletedIdsKey, jsonEncode(ids.toList()));
-    } catch (e) {
-      debugPrint('⚠️ Error saving deleted IDs: $e');
-    }
-  }
-
-  /// تصفية العناصر المحذوفة (Soft Delete)
-  Future<List<T>> _filterDeleted<T>(List<T> items, String Function(T) getId) async {
-    final deletedIds = await _getDeletedIds();
-    return items.where((item) => !deletedIds.contains(getId(item))).toList();
-  }
-
-  /// يحافظ على آخر 50 عنصر فقط (FIFO)
+  // يحافظ على آخر 50 عنصر فقط (FIFO)
   List<T> _limitHistory<T>(List<T> history) {
     if (history.length <= ScanRepository.maxHistoryItems) {
       return history;
@@ -109,6 +62,39 @@ class ScanRepositoryImpl implements ScanRepository {
       throw Exception('الرجاء إدخال رابط صالح');
     }
 
+    // ── 1. Check local url_cache first ──────────────────────────────────────
+    final cached = await _cache.getCachedResult(link);
+    if (cached != null) {
+      debugPrint('✅ [Cache] HIT — returning local result for $link');
+
+      // Decode the full engine_results JSON that was stored verbatim from the
+      // backend response. We then reconstruct a ScanResult via fromJson so that
+      // every field (score, details, domain, threatsCount, rawData …) is
+      // identical to what the user would see with a fresh server call.
+      final engineData = (cached.engineResults.isNotEmpty)
+          ? Map<String, dynamic>.from(
+              jsonDecode(cached.engineResults) as Map<String, dynamic>,
+            )
+          : <String, dynamic>{};
+
+      // Patch fields that the cached JSON might not have stored, so fromJson
+      // always gets a complete object.
+      engineData.putIfAbsent('id',
+          () => 'cache_${cached.urlHash.substring(0, 8)}');
+      engineData.putIfAbsent('link', () => cached.url);
+      engineData.putIfAbsent(
+          'timestamp',
+          () => DateTime.fromMillisecondsSinceEpoch(cached.createdAt * 1000)
+              .toIso8601String());
+      engineData.putIfAbsent('source', () => 'local_cache');
+
+      // Re-use ScanResult.fromJson so all fields are parsed identically to
+      // a live response — no hand-crafted fallbacks needed.
+      final result = ScanResult.fromJson(engineData);
+      return _toEntity(result);
+    }
+
+    // ── 2. Cache MISS → call backend ─────────────────────────────────────────
     debugPrint('🌐 [API] Calling SafeClick backend for $link');
     try {
       final response = await _remote.scanLink(link);
@@ -116,7 +102,23 @@ class ScanRepositoryImpl implements ScanRepository {
       if (response['success'] == true && response['result'] != null) {
         final resultData = response['result'];
         final scanResult = ScanResult.fromJson(resultData);
-        return _toEntity(scanResult);
+        final entity     = _toEntity(scanResult);
+
+        // ── 3. Store result in url_cache ─────────────────────────────────────
+        final classification = entity.safe == true
+            ? 'safe'
+            : entity.safe == false
+                ? 'malicious'
+                : 'suspicious';
+
+        final cacheEntry = UrlCacheEntry.create(
+          url:            link,
+          classification: classification,
+          engineResults:  resultData,
+        );
+        await _cache.setCachedResult(cacheEntry);
+
+        return entity;
       } else {
         final message = response['message']?.toString() ?? 'فشل الفحص';
         throw Exception(message);
@@ -130,28 +132,14 @@ class ScanRepositoryImpl implements ScanRepository {
   @override
   Future<List<ScanEntity>> getScanHistory() async {
     try {
-      // 1. Load local history
-      final localHistory = await _localStorage.getScanHistory();
-      debugPrint('📦 [History] Local records before filter: ${localHistory.length}');
+      // 1. Load local history from SQLite
+      final localHistoryData = await _cache.getScansHistory();
+      debugPrint('📦 [History] Read from SQLite: ${localHistoryData.length} records');
       
-      // 2. Filter out soft-deleted items
-      final filteredHistory = await _filterDeleted<ScanResult>(
-        localHistory, 
-        (item) => item.id
-      );
+      // 2. Apply limit
+      final limitedHistoryData = _limitHistory(localHistoryData);
       
-      debugPrint('📦 [History] Local records after filter: ${filteredHistory.length}');
-      
-      // 3. Apply limit
-      final limitedHistory = _limitHistory(filteredHistory);
-      
-      // 4. Save filtered history back (to clean up)
-      if (limitedHistory.length != localHistory.length) {
-        await _localStorage.saveScanHistory(limitedHistory);
-        debugPrint('📦 [History] Saved filtered history: ${limitedHistory.length} records');
-      }
-      
-      return limitedHistory.map(_toEntity).toList();
+      return limitedHistoryData.map((data) => _toEntity(ScanResult.fromJson(data))).toList();
     } catch (e) {
       debugPrint('📦 [History] Local read error: $e');
       return [];
@@ -170,21 +158,14 @@ class ScanRepositoryImpl implements ScanRepository {
         
         // Convert to models for storage
         final models = entities.map(_toModel).toList();
+        final modelsData = models.map((m) => m.toJson()).toList().cast<Map<String, dynamic>>();
         
-        // Filter out deleted items
-        final filteredModels = await _filterDeleted<ScanResult>(
-          models, 
-          (item) => item.id
-        );
+        // Save to SQLite
+        await _cache.saveScansHistory(modelsData);
+        debugPrint('🔄 [History] Synced ${modelsData.length} records from server to SQLite');
         
-        // Apply limit
-        final limitedModels = _limitHistory(filteredModels);
-        
-        // Save to local storage
-        await _localStorage.saveScanHistory(limitedModels);
-        debugPrint('🔄 [History] Synced ${limitedModels.length} records from server');
-        
-        return limitedModels.map(_toEntity).toList();
+        // Return latest from local DB
+        return getScanHistory();
       }
     } catch (e) {
       debugPrint('🔴 [History] Remote sync failed: $e');
@@ -195,16 +176,7 @@ class ScanRepositoryImpl implements ScanRepository {
   @override
   Future<bool> softDeleteScan(String id) async {
     try {
-      // 1. Add to deleted IDs set
-      final deletedIds = await _getDeletedIds();
-      deletedIds.add(id);
-      await _saveDeletedIds(deletedIds);
-      
-      // 2. Remove from local storage (optional, but good for cleanup)
-      final currentHistory = await _localStorage.getScanHistory();
-      final updatedHistory = currentHistory.where((s) => s.id != id).toList();
-      await _localStorage.saveScanHistory(updatedHistory);
-      
+      await _cache.softDeleteScan(id);
       debugPrint('✅ [SoftDelete] Scan hidden from user: $id');
       return true;
     } catch (e) {
@@ -216,19 +188,7 @@ class ScanRepositoryImpl implements ScanRepository {
   @override
   Future<bool> clearUserHistory() async {
     try {
-      // 1. Get all current history IDs
-      final currentHistory = await _localStorage.getScanHistory();
-      final ids = currentHistory.map((s) => s.id).toList();
-      
-      // 2. Add all IDs to deleted set
-      final deletedIds = await _getDeletedIds();
-      deletedIds.addAll(ids);
-      await _saveDeletedIds(deletedIds);
-      
-      // 3. Clear local storage
-      await _localStorage.saveScanHistory([]);
-      await _cache.clearAll();
-      
+      await _cache.clearUserHistory();
       debugPrint('✅ [SoftDelete] All scans hidden from user');
       return true;
     } catch (e) {
@@ -240,16 +200,11 @@ class ScanRepositoryImpl implements ScanRepository {
   @override
   Future<void> saveHistory(List<ScanEntity> history) async {
     try {
-      // Filter out deleted items before saving
       final models = history.map(_toModel).toList();
-      final filteredModels = await _filterDeleted<ScanResult>(
-        models, 
-        (item) => item.id
-      );
+      final modelsData = models.map((m) => m.toJson()).toList().cast<Map<String, dynamic>>();
       
-      final limitedModels = _limitHistory(filteredModels);
-      await _localStorage.saveScanHistory(limitedModels);
-      debugPrint('💾 [Save] Saved ${limitedModels.length} records to local storage');
+      await _cache.saveScansHistory(modelsData);
+      debugPrint('💾 [Save] Saved ${modelsData.length} records to local storage');
     } catch (e) {
       debugPrint('🔴 [Save] Failed to save history: $e');
       rethrow;

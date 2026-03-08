@@ -1,7 +1,7 @@
 ﻿import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:safeclik/core/network/api_service.dart';
+import 'package:safeclik/core/network/api_client.dart';
 import 'package:safeclik/features/auth/presentation/providers/auth_controller.dart';
 import 'package:safeclik/features/auth/presentation/pages/register_screen.dart';
 
@@ -143,7 +143,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   }
 
   void _showDeveloperSettings() {
-    final controller = TextEditingController(text: ApiService.baseUrl);
+    final controller = TextEditingController(text: ApiClient.baseUrl);
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -175,7 +175,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
           ),
           ElevatedButton(
             onPressed: () async {
-              await ApiService.updateBaseUrl(controller.text.trim());
+              await ApiClient.updateBaseUrl(controller.text.trim());
               if (!context.mounted) return;
               Navigator.pop(context);
               ScaffoldMessenger.of(context).showSnackBar(
@@ -440,11 +440,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
           ),
           ElevatedButton(
             onPressed: () async {
-              Navigator.pop(context);
               final success = await ref.read(authProvider.notifier).resetPassword(emailController.text);
               final error = ref.read(authProvider.notifier).error;
               
               if (!context.mounted) return;
+              Navigator.pop(context);
                   
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(

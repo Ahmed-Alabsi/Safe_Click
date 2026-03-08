@@ -312,7 +312,7 @@ class ResultScreen extends StatelessWidget {
                     borderRadius: BorderRadius.circular(100),
                   ),
                   child: Text(
-                    'ID: ${scanResult.id.substring(0, 6)}...',
+                    'ID: ${scanResult.id.length > 6 ? scanResult.id.substring(0, 6) : scanResult.id}...',
                     style: theme.textTheme.labelSmall?.copyWith(
                       color: theme.colorScheme.onSurfaceVariant,
                     ),
@@ -782,7 +782,8 @@ class ResultScreen extends StatelessWidget {
         ),
       );
 
-      if (!shouldProceed) return;
+      if (!context.mounted) return;
+      if (shouldProceed != true) return;
     }
 
     try {

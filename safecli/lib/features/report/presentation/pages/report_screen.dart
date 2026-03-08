@@ -2,6 +2,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:safeclik/features/report/presentation/providers/report_controller.dart';
 import 'package:safeclik/features/auth/presentation/providers/auth_controller.dart';
+import 'package:safeclik/features/report/data/models/report_model.dart';
 
 class ReportScreen extends ConsumerStatefulWidget {
   const ReportScreen({super.key});
@@ -67,29 +68,34 @@ class _ReportScreenState extends ConsumerState<ReportScreen> with SingleTickerPr
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Container(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [
-              Theme.of(context).colorScheme.tertiary,
-              Theme.of(context).colorScheme.surface,
-            ],
+      body: Directionality(
+        textDirection: TextDirection.rtl,
+        child: Container(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [
+                Theme.of(context).colorScheme.tertiary,
+                Theme.of(context).colorScheme.surface,
+              ],
+            ),
           ),
-        ),
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            children: [
-              _buildHeader(context),
-              const SizedBox(height: 20),
-              _buildForm(context),
-              const SizedBox(height: 20),
-              _buildGuidelines(context),
-              const SizedBox(height: 20),
-              _buildErrorWidget(context),
-            ],
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              children: [
+                _buildHeader(context),
+                const SizedBox(height: 20),
+                _buildForm(context),
+                const SizedBox(height: 20),
+                _buildGuidelines(context),
+                const SizedBox(height: 20),
+                _buildReportsHistory(context),
+                const SizedBox(height: 20),
+                _buildErrorWidget(context),
+              ],
+            ),
           ),
         ),
       ),
@@ -446,6 +452,345 @@ class _ReportScreenState extends ConsumerState<ReportScreen> with SingleTickerPr
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  // ─── Reports History Section ────────────────────────────────────────────────
+
+  Widget _buildReportsHistory(BuildContext context) {
+    final reportsAsync = ref.watch(reportProvider);
+
+    return reportsAsync.when(
+      loading: () => Container(
+        padding: const EdgeInsets.symmetric(vertical: 24),
+        alignment: Alignment.center,
+        child: Column(
+          children: [
+            CircularProgressIndicator(
+              color: Theme.of(context).colorScheme.primary,
+              strokeWidth: 2,
+            ),
+            const SizedBox(height: 12),
+            Text(
+              'جارٍ تحميل بلاغاتك...',
+              style: TextStyle(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+                fontSize: 13,
+              ),
+            ),
+          ],
+        ),
+      ),
+      error: (_, __) => const SizedBox.shrink(),
+      data: (reports) {
+        // ── SECTION HEADER ──
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Icon(
+                    Icons.history_edu_rounded,
+                    color: Theme.of(context).colorScheme.primary,
+                    size: 22,
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Text(
+                  'سجل البلاغات',
+                  style: TextStyle(
+                    fontSize: 17,
+                    fontWeight: FontWeight.bold,
+                    color: Theme.of(context).colorScheme.onSurface,
+                  ),
+                ),
+                const Spacer(),
+                if (reports.isNotEmpty)
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).colorScheme.primary,
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Text(
+                      '${reports.length}',
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.onPrimary,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 13,
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 12),
+
+            // ── EMPTY STATE ──
+            if (reports.isEmpty)
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(28),
+                decoration: BoxDecoration(
+                  color: Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(
+                    color: Theme.of(context).colorScheme.outlineVariant,
+                  ),
+                ),
+                child: Column(
+                  children: [
+                    Icon(
+                      Icons.inbox_outlined,
+                      size: 48,
+                      color: Theme.of(context).colorScheme.onSurfaceVariant.withValues(alpha: 0.5),
+                    ),
+                    const SizedBox(height: 10),
+                    Text(
+                      'لا توجد بلاغات مُرسَلة بعد',
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        fontSize: 14,
+                      ),
+                    ),
+                  ],
+                ),
+              )
+            else
+              // ── REPORTS LIST ──
+              ListView.separated(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                itemCount: reports.length,
+                separatorBuilder: (_, __) => const SizedBox(height: 10),
+                itemBuilder: (context, index) =>
+                    _buildReportCard(context, reports[index]),
+              ),
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _buildReportCard(BuildContext context, ReportModel report) {
+    final displayUrl = report.link.length > 45
+        ? '${report.link.substring(0, 42)}...'
+        : report.link;
+
+    final date = report.reportDate;
+    final dateStr =
+        '${date.year}/${date.month.toString().padLeft(2, '0')}/${date.day.toString().padLeft(2, '0')}';
+
+    return Container(
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surface,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: Theme.of(context).colorScheme.outlineVariant.withValues(alpha: 0.6),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Theme.of(context).shadowColor.withValues(alpha: 0.06),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(14),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // ── TOP ROW: tracking number + status badge ──
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      if (report.trackingNumber != null) ...[
+                        Row(
+                          children: [
+                            Icon(
+                              Icons.tag,
+                              size: 14,
+                              color: Theme.of(context).colorScheme.primary,
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              report.trackingNumber!,
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.bold,
+                                color: Theme.of(context).colorScheme.primary,
+                                letterSpacing: 0.5,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 6),
+                      ],
+                      // URL
+                      Row(
+                        children: [
+                          Icon(
+                            Icons.link,
+                            size: 14,
+                            color: Theme.of(context).colorScheme.onSurfaceVariant,
+                          ),
+                          const SizedBox(width: 4),
+                          Expanded(
+                            child: Text(
+                              displayUrl,
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Theme.of(context).colorScheme.onSurfaceVariant,
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 8),
+                // Status badge
+                _buildStatusBadge(context, report.status),
+              ],
+            ),
+
+            const SizedBox(height: 10),
+            const Divider(height: 1),
+            const SizedBox(height: 10),
+
+            // ── BOTTOM ROW: category + severity + date ──
+            Row(
+              children: [
+                // Category chip
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).colorScheme.secondaryContainer.withValues(alpha: 0.5),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text(
+                    report.category,
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w500,
+                      color: Theme.of(context).colorScheme.onSecondaryContainer,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 6),
+                // Severity chip
+                _buildSeverityChip(context, report.severity),
+                const Spacer(),
+                // Date
+                Row(
+                  children: [
+                    Icon(
+                      Icons.calendar_today_outlined,
+                      size: 12,
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      dateStr,
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Colored badge for the 5 backend report statuses.
+  Widget _buildStatusBadge(BuildContext context, String? status) {
+    final cfg = _statusConfig(status);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      decoration: BoxDecoration(
+        color: cfg.$1.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: cfg.$1.withValues(alpha: 0.4)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 7,
+            height: 7,
+            decoration: BoxDecoration(
+              color: cfg.$1,
+              shape: BoxShape.circle,
+            ),
+          ),
+          const SizedBox(width: 5),
+          Text(
+            cfg.$2,
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.bold,
+              color: cfg.$1,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Returns (color, arabicLabel) for a given status string.
+  (Color, String) _statusConfig(String? status) {
+    switch (status) {
+      case 'pending':
+        return (const Color(0xFFE67E22), 'قيد المراجعة');   // orange
+      case 'reviewing':
+        return (const Color(0xFF2980B9), 'قيد التحقيق');    // blue
+      case 'confirmed':
+        return (const Color(0xFFC0392B), 'تم التأكيد');     // red
+      case 'rejected':
+        return (const Color(0xFF7F8C8D), 'مرفوض');          // grey
+      case 'resolved':
+        return (const Color(0xFF27AE60), 'تم الحل');        // green
+      default:
+        return (const Color(0xFFE67E22), 'قيد المراجعة');   // fallback
+    }
+  }
+
+  Widget _buildSeverityChip(BuildContext context, int severity) {
+    final labels = {1: 'منخفض', 2: 'متوسط', 3: 'عالي', 4: 'خطير', 5: 'حرج'};
+    final label = labels[severity] ?? '؟';
+    final color = _getSeverityColor(context, severity);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: color.withValues(alpha: 0.35)),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+          fontSize: 11,
+          fontWeight: FontWeight.w500,
+          color: color,
+        ),
       ),
     );
   }

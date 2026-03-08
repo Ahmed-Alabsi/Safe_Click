@@ -621,42 +621,6 @@ Padding(
     );
   }
 
-  // ========== عنصر الإحصائية ==========
-  Widget _buildStatItem(
-    BuildContext context,
-    String label,
-    String value,
-    IconData icon,
-    Color color,
-    ThemeData theme,
-  ) {
-    return Column(
-      children: [
-        Container(
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: color.withValues(alpha: 0.1),
-            shape: BoxShape.circle,
-          ),
-          child: Icon(icon, color: color, size: 24),
-        ),
-        const SizedBox(height: 8),
-        Text(
-          value,
-          style: theme.textTheme.titleLarge?.copyWith(
-            fontWeight: FontWeight.bold,
-            color: color,
-          ),
-        ),
-        Text(
-          label,
-          style: theme.textTheme.bodySmall?.copyWith(
-            color: theme.colorScheme.onSurfaceVariant,
-          ),
-        ),
-      ],
-    );
-  }
 
   // ========== عنصر معلومات ==========
   Widget _buildInfoTile(
@@ -709,12 +673,6 @@ Padding(
     );
   }
 
-  // ========== حساب نسبة الأمان ==========
-  int _calculateSafePercentage(dynamic user) {
-    if (user.scannedLinks == 0) return 0;
-    final safeScans = user.scannedLinks - user.detectedThreats;
-    return ((safeScans / user.scannedLinks) * 100).round();
-  }
 
   // ========== تنسيق التاريخ ==========
   String _formatDate(DateTime date) {

@@ -3,21 +3,21 @@
 // Thin wrapper around ApiService for scan-related endpoints.
 // Does NOT modify ApiService logic.
 
-import 'package:safeclik/core/network/api_service.dart';
+import 'package:safeclik/core/network/scan_api.dart';
 
 class RemoteScanDataSource {
-  final ApiService _apiService;
-  RemoteScanDataSource(this._apiService);
+  final ScanApi _scanApi;
+  RemoteScanDataSource(this._scanApi);
 
   Future<Map<String, dynamic>> scanLink(String link) =>
-      _apiService.scanLink(link);
+      _scanApi.scanLink(link);
 
   Future<Map<String, dynamic>> getScanHistory() =>
-      _apiService.getScanHistory();
+      _scanApi.getScanHistory();
 
   Future<Map<String, dynamic>> deleteScan(String id) =>
-      _apiService.deleteScan(id);
+      _scanApi.deleteScan(id);
 
   Future<Map<String, dynamic>> clearHistory() =>
-      _apiService.clearHistory();
+      _scanApi.clearHistory();
 }

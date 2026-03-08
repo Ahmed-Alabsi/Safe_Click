@@ -1,5 +1,9 @@
 import 'package:get_it/get_it.dart';
-import 'package:safeclik/core/network/api_service.dart';
+import 'package:safeclik/core/network/api_client.dart';
+import 'package:safeclik/core/network/auth_api.dart';
+import 'package:safeclik/core/network/scan_api.dart';
+import 'package:safeclik/core/network/report_api.dart';
+import 'package:safeclik/core/network/settings_api.dart';
 import 'package:safeclik/core/utils/local_storage_service.dart';
 import 'package:safeclik/core/utils/notification_service.dart';
 import 'package:safeclik/core/utils/scan_cache_service.dart';
@@ -17,7 +21,11 @@ final sl = GetIt.instance;
 
 Future<void> initDI() async {
   // ── Core Services ─────────────────────────────────────────────────────────
-  sl.registerLazySingleton<ApiService>(() => ApiService());
+  sl.registerLazySingleton<ApiClient>(() => ApiClient());
+  sl.registerLazySingleton<AuthApi>(() => AuthApi(sl()));
+  sl.registerLazySingleton<ScanApi>(() => ScanApi(sl()));
+  sl.registerLazySingleton<ReportApi>(() => ReportApi(sl()));
+  sl.registerLazySingleton<SettingsApi>(() => SettingsApi(sl()));
   sl.registerLazySingleton<LocalStorageService>(() => LocalStorageService());
   sl.registerLazySingleton<NotificationService>(() => NotificationService());
 
@@ -37,7 +45,6 @@ Future<void> initDI() async {
   final scanRepo = ScanRepositoryImpl(
     remote: sl(),
     cache: sl(),
-    localStorage: sl(),
   );
   sl.registerLazySingleton<ScanRepository>(() => scanRepo);
   sl.registerLazySingleton<ScanRepositoryImpl>(() => scanRepo);

@@ -1,5 +1,5 @@
 ﻿import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:safeclik/core/network/api_service.dart';
+import 'package:safeclik/core/network/report_api.dart';
 import 'package:safeclik/features/report/data/models/report_model.dart';
 import 'package:safeclik/core/di/di.dart';
 import 'package:flutter/foundation.dart';
@@ -9,7 +9,7 @@ final reportProvider = AsyncNotifierProvider<ReportNotifier, List<ReportModel>>(
 );
 
 class ReportNotifier extends AsyncNotifier<List<ReportModel>> {
-  final ApiService _apiService = sl<ApiService>();
+  final ReportApi _reportApi = sl<ReportApi>();
   String? _lastError;
   bool _isReporting = false;
 
@@ -23,7 +23,7 @@ class ReportNotifier extends AsyncNotifier<List<ReportModel>> {
 
   Future<List<ReportModel>> _fetchMyReports() async {
     try {
-      final response = await _apiService.getMyReports();
+      final response = await _reportApi.getMyReports();
       if (response['success'] == true) {
         final List<dynamic> reportsJson = response['reports'] ?? [];
         return reportsJson.map((json) => ReportModel.fromJson(json)).toList();
@@ -52,7 +52,7 @@ class ReportNotifier extends AsyncNotifier<List<ReportModel>> {
     try {
       debugPrint('🔵 إرسال بلاغ: $link - $category');
       
-      final response = await _apiService.createReport(
+      final response = await _reportApi.createReport(
         link: link,
         category: category,
         description: description,

@@ -4,12 +4,10 @@ import 'dart:io';
 import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:safeclik/features/auth/data/models/user_model.dart';
-import 'package:safeclik/features/scan/data/models/scan_result.dart';
 import 'package:safeclik/features/report/data/models/report_model.dart';
 
 class LocalStorageService {
   static const String _usersKey = 'users';
-  static const String _scanHistoryKey = 'scanHistory';
   static const String _reportsKey = 'reports';
 
   // حفظ المستخدم
@@ -101,32 +99,7 @@ Future<String?> getString(String key) async {
     }
   }
 
-  // حفظ سجل الفحوصات
-  Future<void> saveScanHistory(List<ScanResult> history) async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final historyJson = history.map((e) => jsonEncode(e.toJson())).toList();
-      await prefs.setStringList(_scanHistoryKey, historyJson);
-    } catch (e) {
-      debugPrint('خطأ في حفظ السجل: $e');
-      rethrow;
-    }
-  }
 
-  // جلب سجل الفحوصات
-  Future<List<ScanResult>> getScanHistory() async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final historyJson = prefs.getStringList(_scanHistoryKey) ?? [];
-      
-      return historyJson
-          .map((json) => ScanResult.fromJson(jsonDecode(json)))
-          .toList();
-    } catch (e) {
-      debugPrint('خطأ في جلب السجل: $e');
-      return [];
-    }
-  }
 
   // حفظ البلاغات
   Future<void> saveReports(List<ReportModel> reports) async {

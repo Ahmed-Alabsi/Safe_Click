@@ -8,7 +8,7 @@ import 'package:safeclik/core/di/di.dart';
 import 'package:safeclik/core/utils/notification_service.dart';
 import 'package:safeclik/core/theme/app_theme.dart';
 
-import 'package:safeclik/core/network/api_service.dart';
+import 'package:safeclik/core/network/api_client.dart';
 import 'package:safeclik/features/auth/presentation/providers/auth_controller.dart';
 import 'package:safeclik/features/settings/presentation/providers/settings_controller.dart';
 import 'package:safeclik/features/scan/presentation/controllers/scan_notifier.dart';
@@ -36,7 +36,7 @@ Future<void> main() async {
   await initDI();
 
   // Phase 6: Initialize Smart API Discovery
-  await ApiService.initialize();
+  await ApiClient.initialize();
 
   // Initialize Notifications
   await sl<NotificationService>().initialize();

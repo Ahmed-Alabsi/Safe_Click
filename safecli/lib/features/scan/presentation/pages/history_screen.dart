@@ -13,11 +13,9 @@ class HistoryScreen extends ConsumerStatefulWidget {
 
 class _HistoryScreenState extends ConsumerState<HistoryScreen> with SingleTickerProviderStateMixin {
   late TabController _tabController;
-  int _selectedIndex = 0;
   
   // 🔍 متغيرات البحث
   final TextEditingController _searchController = TextEditingController();
-  String _searchQuery = '';
   bool _isSearching = false;
 
   @override
@@ -31,14 +29,12 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> with SingleTicker
   }
 
   void _handleTabSelection() {
-    // التحقق من أن المؤشر في النطاق الصحيح قبل التحديث
     if (_tabController.indexIsChanging) {
+      ref.read(historyFilterProvider.notifier).state = _tabController.index;
+      ref.read(historySearchProvider.notifier).state = '';
       setState(() {
-        _selectedIndex = _tabController.index;
-        // إعادة تعيين البحث عند تغيير التبويب
-        _searchQuery = '';
-        _searchController.clear();
         _isSearching = false;
+        _searchController.clear();
       });
     }
   }
@@ -51,38 +47,6 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> with SingleTicker
     super.dispose();
   }
 
-  List<ScanResult> _getFilteredHistory(List<ScanResult> history) {
-    // أولاً: تطبيق فلتر التبويب
-    List<ScanResult> tabFiltered;
-    switch (_selectedIndex) {
-      case 0: // الكل
-        tabFiltered = history;
-        break;
-      case 1: // آمن
-        tabFiltered = history.where((scan) => scan.safe == true).toList();
-        break;
-      case 2: // مشبوه (suspicious)
-        tabFiltered = history.where((scan) => scan.safe == null).toList();
-        break;
-      case 3: // خطر
-        tabFiltered = history.where((scan) => scan.safe == false).toList();
-        break;
-      default:
-        tabFiltered = history;
-    }
-    
-    // ثانياً: تطبيق البحث إذا كان موجوداً
-    if (_searchQuery.isNotEmpty) {
-      return tabFiltered.where((scan) {
-        final linkLower = scan.link.toLowerCase();
-        final queryLower = _searchQuery.toLowerCase();
-        return linkLower.contains(queryLower);
-      }).toList();
-    }
-    
-    return tabFiltered;
-  }
-
   void _startSearch() {
     setState(() {
       _isSearching = true;
@@ -90,40 +54,36 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> with SingleTicker
   }
 
   void _stopSearch() {
+    ref.read(historySearchProvider.notifier).state = '';
     setState(() {
       _isSearching = false;
-      _searchQuery = '';
       _searchController.clear();
     });
   }
 
   void _updateSearch(String value) {
-    setState(() {
-      _searchQuery = value;
-    });
+    ref.read(historySearchProvider.notifier).state = value;
   }
 
   void _changeTab(int index) {
-  // التحقق من أن المؤشر في النطاق الصحيح قبل التغيير
-  if (index >= 0 && index < _tabController.length) {
-    _tabController.animateTo(index);
-    // تحديث الحالة مباشرة
-    setState(() {
-      _selectedIndex = index;
-      // إعادة تعيين البحث عند تغيير التبويب
-      _searchQuery = '';
-      _searchController.clear();
-      _isSearching = false;
-    });
+    if (index >= 0 && index < _tabController.length) {
+      _tabController.animateTo(index);
+      ref.read(historyFilterProvider.notifier).state = index;
+      ref.read(historySearchProvider.notifier).state = '';
+      setState(() {
+        _isSearching = false;
+        _searchController.clear();
+      });
+    }
   }
-}
 
   @override
   Widget build(BuildContext context) {
-    final scanState = ref.watch(scanNotifierProvider);
-    final scanHistory = scanState.scanHistory;
-    final filteredHistory = _getFilteredHistory(scanHistory);
+    final scanHistory = ref.watch(scanNotifierProvider).scanHistory;
+    final filteredHistory = ref.watch(filteredHistoryProvider);
     final theme = Theme.of(context);
+    final searchQuery = ref.watch(historySearchProvider);
+    final selectedIndex = ref.watch(historyFilterProvider);
 
     return Directionality(
       textDirection: TextDirection.rtl,
@@ -153,6 +113,7 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> with SingleTicker
                     children: [
                       _buildTabItem(
                         index: 0,
+                        selectedIndex: selectedIndex,
                         icon: Icons.list_alt_rounded,
                         label: 'الكل',
                         count: scanHistory.length,
@@ -160,6 +121,7 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> with SingleTicker
                       ),
                       _buildTabItem(
                         index: 1,
+                        selectedIndex: selectedIndex,
                         icon: Icons.check_circle_rounded,
                         label: 'آمن',
                         count: scanHistory.where((s) => s.safe == true).length,
@@ -167,6 +129,7 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> with SingleTicker
                       ),
                       _buildTabItem(
                         index: 2,
+                        selectedIndex: selectedIndex,
                         icon: Icons.warning_amber_rounded,
                         label: 'مشبوه',
                         count: scanHistory.where((s) => s.safe == null).length,
@@ -174,6 +137,7 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> with SingleTicker
                       ),
                       _buildTabItem(
                         index: 3,
+                        selectedIndex: selectedIndex,
                         icon: Icons.dangerous_rounded,
                         label: 'خطر',
                         count: scanHistory.where((s) => s.safe == false).length,
@@ -184,7 +148,7 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> with SingleTicker
                 ),
 
               // عرض عدد نتائج البحث
-              if (_isSearching && _searchQuery.isNotEmpty)
+              if (_isSearching && searchQuery.isNotEmpty)
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
                   child: Row(
@@ -208,7 +172,7 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> with SingleTicker
                         ),
                       ),
                       const Spacer(),
-                      if (filteredHistory.isEmpty && _searchQuery.isNotEmpty)
+                      if (filteredHistory.isEmpty && searchQuery.isNotEmpty)
                         TextButton.icon(
                           onPressed: _stopSearch,
                           icon: const Icon(Icons.close, size: 16),
@@ -224,7 +188,7 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> with SingleTicker
               // المحتوى الرئيسي
               Expanded(
                 child: filteredHistory.isEmpty
-                    ? _buildEmptyState(theme)
+                    ? _buildEmptyState(theme, selectedIndex, searchQuery)
                     : ListView.builder(
                         padding: const EdgeInsets.all(20),
                         itemCount: filteredHistory.length,
@@ -265,7 +229,13 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> with SingleTicker
               ),
             ),
             const SizedBox(width: 12),
-            
+            Text(
+              'سجل الفحوصات',
+              style: theme.textTheme.titleLarge?.copyWith(
+                fontWeight: FontWeight.bold,
+                color: theme.colorScheme.onSurface,
+              ),
+            ),
           ],
         ),
         Row(
@@ -352,8 +322,8 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> with SingleTicker
     );
   }
 
-  Widget _buildEmptyState(ThemeData theme) {
-    if (_isSearching && _searchQuery.isNotEmpty) {
+  Widget _buildEmptyState(ThemeData theme, int selectedIndex, String searchQuery) {
+    if (_isSearching && searchQuery.isNotEmpty) {
       return Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -410,24 +380,24 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> with SingleTicker
             padding: const EdgeInsets.all(30),
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              color: _getEmptyIconColor(theme).withValues(alpha: 0.1),
+              color: _getEmptyIconColor(theme, selectedIndex).withValues(alpha: 0.1),
             ),
             child: Icon(
-              _getEmptyIcon(),
+              _getEmptyIcon(selectedIndex),
               size: 60,
-              color: _getEmptyIconColor(theme).withValues(alpha: 0.5),
+              color: _getEmptyIconColor(theme, selectedIndex).withValues(alpha: 0.5),
             ),
           ),
           const SizedBox(height: 24),
           Text(
-            _getEmptyMessage(),
+            _getEmptyMessage(selectedIndex),
             style: theme.textTheme.titleMedium?.copyWith(
               color: theme.colorScheme.onSurfaceVariant,
             ),
           ),
           const SizedBox(height: 8),
           Text(
-            _getEmptySubMessage(),
+            _getEmptySubMessage(selectedIndex),
             style: theme.textTheme.bodySmall?.copyWith(
               color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.7),
             ),
@@ -439,12 +409,13 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> with SingleTicker
 
   Widget _buildTabItem({
     required int index,
+    required int selectedIndex,
     required IconData icon,
     required String label,
     required int count,
     required Color color,
   }) {
-    final isSelected = _selectedIndex == index;
+    final isSelected = selectedIndex == index;
     final theme = Theme.of(context);
 
     return Expanded(
@@ -663,8 +634,8 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> with SingleTicker
     }
   }
 
-  IconData _getEmptyIcon() {
-    switch (_selectedIndex) {
+  IconData _getEmptyIcon(int selectedIndex) {
+    switch (selectedIndex) {
       case 0:
         return Icons.history_outlined;
       case 1:
@@ -678,8 +649,8 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> with SingleTicker
     }
   }
 
-  Color _getEmptyIconColor(ThemeData theme) {
-    switch (_selectedIndex) {
+  Color _getEmptyIconColor(ThemeData theme, int selectedIndex) {
+    switch (selectedIndex) {
       case 1:
         return theme.colorScheme.tertiary;
       case 2:
@@ -691,8 +662,8 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> with SingleTicker
     }
   }
 
-  String _getEmptyMessage() {
-    switch (_selectedIndex) {
+  String _getEmptyMessage(int selectedIndex) {
+    switch (selectedIndex) {
       case 0:
         return 'لا يوجد سجل فحوصات';
       case 1:
@@ -706,8 +677,8 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> with SingleTicker
     }
   }
 
-  String _getEmptySubMessage() {
-    switch (_selectedIndex) {
+  String _getEmptySubMessage(int selectedIndex) {
+    switch (selectedIndex) {
       case 0:
         return 'قم بفحص رابط جديد ليظهر هنا';
       case 1:

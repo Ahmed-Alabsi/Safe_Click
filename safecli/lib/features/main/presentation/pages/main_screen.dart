@@ -273,36 +273,6 @@ class _MainScreenState extends ConsumerState<MainScreen> with TickerProviderStat
     );
   }
 
-  Widget _buildQuickActionButton({
-    required IconData icon,
-    required String label,
-    required Color color,
-    required VoidCallback onTap,
-  }) {
-    return Expanded(
-      child: InkWell(
-        onTap: onTap,
-        child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 12),
-          decoration: BoxDecoration(
-            color: color.withValues(alpha: 0.1),
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: color.withValues(alpha: 0.3)),
-          ),
-          child: Column(
-            children: [
-              Icon(icon, color: color),
-              const SizedBox(height: 4),
-              Text(
-                label,
-                style: TextStyle(color: color, fontSize: 12),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
 
   Widget _buildStats() {
     final scanState = ref.watch(scanNotifierProvider);
