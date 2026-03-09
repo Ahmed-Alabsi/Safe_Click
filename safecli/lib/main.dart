@@ -25,6 +25,7 @@ import 'package:safeclik/features/profile/presentation/pages/profile_screen.dart
 import 'package:safeclik/features/profile/presentation/pages/edit_profile_screen.dart';
 import 'package:safeclik/features/report/presentation/pages/report_screen.dart';
 import 'package:safeclik/features/settings/presentation/pages/settings_screen.dart';
+import 'package:safeclik/features/auth/presentation/pages/forgot_password_screen.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -145,18 +146,16 @@ class _MyAppState extends ConsumerState<MyApp> {
     final settingsAsyncValue = ref.watch(settingsProvider);
     final isDarkMode = settingsAsyncValue.value?.darkMode ?? false;
 
-    // Phase 1 Fix #3: Read reactive AuthState — not notifier fields.
-    final authState = ref.watch(authProvider);
-
     return MaterialApp(
       title: 'SafeClik',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.lightTheme,
       darkTheme: AppTheme.darkTheme,
       themeMode: isDarkMode ? ThemeMode.dark : ThemeMode.light,
-      home: Builder(
-        builder: (context) {
-          // isInitializing is now part of state → UI rebuilds correctly
+      home: Consumer(
+        builder: (context, ref, child) {
+          final authState = ref.watch(authProvider);
+          
           if (authState.isInitializing) {
             return const SplashScreen();
           }
@@ -180,6 +179,7 @@ class _MyAppState extends ConsumerState<MyApp> {
         '/profile': (context) => const ProfileScreen(),
         '/edit_profile': (context) => const EditProfileScreen(),
         '/settings': (context) => const SettingsScreen(),
+        '/forgot_password': (context) => const ForgotPasswordScreen(),
       },
       onGenerateRoute: (settings) {
         if (settings.name == '/result') {

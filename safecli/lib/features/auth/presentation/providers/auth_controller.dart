@@ -1,5 +1,4 @@
 ﻿import 'dart:async';
-import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
@@ -44,7 +43,6 @@ class AuthNotifier extends StateNotifier<AuthState> {
           );
           return;
         }
-        // Invalid / expired token — purge
         await _clearTokens();
       }
     } catch (e) {
@@ -56,31 +54,20 @@ class AuthNotifier extends StateNotifier<AuthState> {
   Future<void> _clearTokens() async {
     await _secureStorage.delete(key: _kAccessToken);
     await _secureStorage.delete(key: _kRefreshToken);
-    // 🔐 Fix: clear in-memory token cache in ApiClient to prevent
-    // stale token being sent after logout (token cache leak).
     sl<ApiClient>().cacheToken(null);
     state = state.copyWith(clearUser: true, clearError: true, isInitializing: false);
   }
 
   // ── Public API ────────────────────────────────────────────────────────────
 
-  Future<bool> login(String email, String password) async {
-    // Only block if we are actually initializing
+  Future<bool> login(String username, String password) async {
     if (state.isInitializing && state.user == null && state.error == null) return false;
     
     state = state.copyWith(isLoading: true, clearError: true);
 
     try {
-      final response = await _authApi.login(email: email, password: password);
+      final response = await _authApi.login(username: username, password: password);
       if (response['success'] == true) {
-        // Persist tokens in secure storage
-        final tokens = response['tokens'];
-        if (tokens != null) {
-          await _secureStorage.write(key: _kAccessToken, value: tokens['access']);
-          await _secureStorage.write(key: _kRefreshToken, value: tokens['refresh']);
-          // Also push to ApiClient in-memory cache
-          // _authApi already caches the token internally!
-        }
         final user = UserModel.fromJson(response['user']);
         state = AuthState(isInitializing: false, isLoading: false, user: user);
         return true;
@@ -92,10 +79,6 @@ class AuthNotifier extends StateNotifier<AuthState> {
         );
         return false;
       }
-    } on SocketException {
-      state = AuthState(isInitializing: false, isLoading: false, error: 'تعذر الاتصال بالخادم');
-    } on TimeoutException {
-      state = AuthState(isInitializing: false, isLoading: false, error: 'انتهت مهلة الاتصال بالخادم');
     } catch (e) {
       debugPrint('Login exception: $e');
       state = AuthState(isInitializing: false, isLoading: false, error: 'تعذر الاتصال بالخادم');
@@ -130,14 +113,8 @@ class AuthNotifier extends StateNotifier<AuthState> {
       );
 
       if (response['success'] == true) {
-        if (response.containsKey('user')) {
-          final user = UserModel.fromJson(response['user']);
-          state = AuthState(isInitializing: false, isLoading: false, user: user);
-          return true;
-        } else {
-          state = state.copyWith(isLoading: false);
-          return await login(email, password);
-        }
+        state = state.copyWith(isLoading: false);
+        return true;
       } else {
         state = AuthState(
           isInitializing: false,
@@ -146,15 +123,65 @@ class AuthNotifier extends StateNotifier<AuthState> {
         );
         return false;
       }
-    } on SocketException {
-      state = AuthState(isInitializing: false, isLoading: false, error: 'تعذر الاتصال بالخادم');
-    } on TimeoutException {
-      state = AuthState(isInitializing: false, isLoading: false, error: 'انتهت مهلة الاتصال بالخادم');
     } catch (e) {
       debugPrint('Register exception: $e');
       state = AuthState(isInitializing: false, isLoading: false, error: 'حدث خطأ غير متوقع');
     }
     return false;
+  }
+
+  Future<bool> verifyOtp(String email, String otp) async {
+    state = state.copyWith(isLoading: true, clearError: true);
+    
+    try {
+      final response = await _authApi.verifyOtp(email: email, otp: otp);
+      if (response['success'] == true) {
+        final data = response['data'] as Map<String, dynamic>?;
+        
+        // If tokens and user are in response (Direct Login)
+        if (data != null && data['tokens'] != null && data['user'] != null) {
+          final user = UserModel.fromJson(data['user']);
+          state = AuthState(isInitializing: false, isLoading: false, user: user);
+        } else {
+          state = state.copyWith(isLoading: false);
+        }
+        return true;
+      }
+      
+      state = state.copyWith(
+        isLoading: false,
+        error: response['message'] ?? 'رمز التحقق غير صحيح',
+      );
+      return false;
+      
+    } catch (e) {
+      debugPrint('VerifyOtp exception: $e');
+      state = state.copyWith(isLoading: false, error: 'حدث خطأ في الاتصال');
+      return false;
+    }
+  }
+
+  Future<bool> resendOtp(String email) async {
+    state = state.copyWith(isLoading: true, clearError: true);
+    
+    try {
+      final response = await _authApi.resendOtp(email);
+      if (response['success'] == true) {
+        state = state.copyWith(isLoading: false);
+        return true;
+      }
+      
+      state = state.copyWith(
+        isLoading: false,
+        error: response['message'] ?? 'فشل إعادة الإرسال',
+      );
+      return false;
+      
+    } catch (e) {
+      debugPrint('ResendOtp exception: $e');
+      state = state.copyWith(isLoading: false, error: 'حدث خطأ في الاتصال');
+      return false;
+    }
   }
 
   Future<void> logout() async {
@@ -165,14 +192,54 @@ class AuthNotifier extends StateNotifier<AuthState> {
     }
   }
 
-  Future<bool> resetPassword(String email) async {
+  Future<bool> verifyResetOtp(String email, String otp) async {
+    state = state.copyWith(isLoading: true, clearError: true);
+    try {
+      final response = await _authApi.verifyResetOtp(email: email, otp: otp);
+      state = state.copyWith(isLoading: false);
+      if (response['success'] == true) return true;
+      state = state.copyWith(error: response['message'] ?? 'الرمز غير صحيح');
+      return false;
+    } catch (e) {
+      debugPrint('VerifyResetOtp exception: $e');
+      state = state.copyWith(isLoading: false, error: 'حدث خطأ في الاتصال');
+      return false;
+    }
+  }
+
+  Future<bool> forgotPassword(String email) async {
     state = state.copyWith(isLoading: true, clearError: true);
     try {
       final response = await _authApi.forgotPassword(email);
       state = state.copyWith(isLoading: false);
-      return response['success'] == true;
+      if (response['success'] == true) return true;
+      state = state.copyWith(error: response['message'] ?? 'فشل طلب استعادة كلمة المرور');
+      return false;
     } catch (e) {
-      debugPrint('ResetPassword exception: $e');
+      debugPrint('ForgotPassword exception: $e');
+      state = state.copyWith(isLoading: false, error: 'حدث خطأ في الاتصال بالخادم');
+      return false;
+    }
+  }
+
+  Future<bool> confirmResetPassword({
+    required String email,
+    required String otp,
+    required String password,
+  }) async {
+    state = state.copyWith(isLoading: true, clearError: true);
+    try {
+      final response = await _authApi.resetPassword(
+        email: email,
+        otp: otp,
+        password: password,
+      );
+      state = state.copyWith(isLoading: false);
+      if (response['success'] == true) return true;
+      state = state.copyWith(error: response['message'] ?? 'فشل إعادة تعيين كلمة المرور');
+      return false;
+    } catch (e) {
+      debugPrint('ConfirmResetPassword exception: $e');
       state = state.copyWith(isLoading: false, error: 'حدث خطأ في الاتصال بالخادم');
       return false;
     }
@@ -182,7 +249,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
     state = state.copyWith(isLoading: true, clearError: true);
     try {
       final response = await _authApi.updateProfile(name: name, email: email);
-      if (response['success'] == true && response.containsKey('user')) {
+      if (response['user'] != null) {
         state = state.copyWith(
           isLoading: false,
           user: UserModel.fromJson(response['user']),
@@ -205,7 +272,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
     state = state.copyWith(isLoading: true, clearError: true);
     try {
       final response = await _authApi.updateProfileImage(imagePath);
-      if (response['success'] == true && response.containsKey('user')) {
+      if (response['user'] != null) {
         state = state.copyWith(
           isLoading: false,
           user: UserModel.fromJson(response['user']),
@@ -246,8 +313,8 @@ class AuthNotifier extends StateNotifier<AuthState> {
 
   void clearError() => state = state.copyWith(clearError: true);
 
-  // ── Convenience getters (computed from state) ─────────────────────────────
-  bool get isAuthenticated => state.isAuthenticated;
+  // ── Convenience getters ───────────────────────────────────────────────────
+  bool get isAuthenticated => state.user != null;
   bool get isInitializing => state.isInitializing;
   String? get error => state.error;
   String? get userProfileImage => state.user?.profileImage;

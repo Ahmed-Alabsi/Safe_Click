@@ -114,63 +114,119 @@ class _ReportScreenState extends ConsumerState<ReportScreen> with SingleTickerPr
     );
   }
 
-  // ✅ الهيدر بدون زر السجل
+  // ✅ الهيدر مع زر السجل الاحترافي
   Widget _buildHeader(BuildContext context, int reportsCount) {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.primary,
-        borderRadius: BorderRadius.circular(20),
+        gradient: LinearGradient(
+          colors: [
+            Theme.of(context).colorScheme.primary,
+            Theme.of(context).colorScheme.primary.withValues(alpha: 0.8),
+          ],
+        ),
+        borderRadius: BorderRadius.circular(25),
         boxShadow: [
           BoxShadow(
-            color: Theme.of(context).shadowColor,
+            color: Theme.of(context).shadowColor.withValues(alpha: 0.3),
             blurRadius: 15,
-            offset: const Offset(0, 5),
+            offset: const Offset(0, 8),
           ),
         ],
       ),
-      child: Row(
+      child: Column(
         children: [
-          // أيقونة التطبيق
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: Theme.of(context).colorScheme.onPrimary.withValues(alpha: 0.2),
-              shape: BoxShape.circle,
-            ),
-            child: Icon(
-              Icons.warning_amber_rounded,
-              size: 40,
-              color: Theme.of(context).colorScheme.onPrimary,
-            ),
-          ),
-          const SizedBox(width: 15),
-          
-          // النصوص
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                Text(
-                  'ساعد في حماية المجتمع',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    color: Theme.of(context).colorScheme.onPrimary,
-                  ),
+          Row(
+            children: [
+              // أيقونة التطبيق
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.2),
+                  shape: BoxShape.circle,
                 ),
-                const SizedBox(height: 4),
-                Text(
-                  'الإبلاغ عن الروابط الضارة يساعد في حماية الآخرين',
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: Theme.of(context).colorScheme.onPrimary.withValues(alpha: 0.9),
-                  ),
+                child: const Icon(
+                  Icons.warning_amber_rounded,
+                  size: 32,
+                  color: Colors.white,
                 ),
-              ],
-            ),
+              ),
+              const SizedBox(width: 15),
+              
+              // النصوص
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'حماية المجتمع',
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                      ),
+                    ),
+                    Text(
+                      'ساهم في جعل الإنترنت مكاناً آمناً للجميع',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.white.withValues(alpha: 0.9),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              
+              // زر السجل الاحترافي
+              _buildHistoryButton(context, reportsCount),
+            ],
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildHistoryButton(BuildContext context, int count) {
+    return InkWell(
+      onTap: () => _showReportsBottomSheet(context),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        decoration: BoxDecoration(
+          color: Colors.white.withValues(alpha: 0.15),
+          borderRadius: BorderRadius.circular(15),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.3)),
+        ),
+        child: Row(
+          children: [
+            if (count > 0)
+              Container(
+                padding: const EdgeInsets.all(4),
+                decoration: const BoxDecoration(
+                  color: Colors.redAccent,
+                  shape: BoxShape.circle,
+                ),
+                child: Text(
+                  '$count',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 10,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            if (count > 0) const SizedBox(width: 8),
+            const Icon(Icons.history_edu_rounded, color: Colors.white, size: 20),
+            const SizedBox(width: 6),
+            const Text(
+              'سجلاتي',
+              style: TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.bold,
+                fontSize: 13,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -196,53 +252,6 @@ class _ReportScreenState extends ConsumerState<ReportScreen> with SingleTickerPr
                     color: Theme.of(context).colorScheme.primary,
                   ),
                 ),
-                const Spacer(),
-                // زر السجل هنا
-                if (ref.watch(reportProvider).value?.isNotEmpty ?? false)
-                  Container(
-                    decoration: BoxDecoration(
-                      color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: Stack(
-                      clipBehavior: Clip.none,
-                      children: [
-                        IconButton(
-                          icon: Icon(
-                            Icons.history_edu_rounded,
-                            color: Theme.of(context).colorScheme.primary,
-                          ),
-                          onPressed: () => _showReportsBottomSheet(context),
-                          tooltip: 'عرض سجل البلاغات',
-                        ),
-                        // عداد البلاغات
-                        Positioned(
-                          top: 0,
-                          right: 0,
-                          child: Container(
-                            padding: const EdgeInsets.all(2),
-                            decoration: BoxDecoration(
-                              color: Colors.red,
-                              shape: BoxShape.circle,
-                            ),
-                            constraints: const BoxConstraints(
-                              minWidth: 16,
-                              minHeight: 16,
-                            ),
-                            child: Text(
-                              '${ref.watch(reportProvider).value?.length ?? 0}',
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 8,
-                                fontWeight: FontWeight.bold,
-                              ),
-                              textAlign: TextAlign.center,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
               ],
             ),
             const SizedBox(height: 20),
@@ -311,6 +320,12 @@ class _ReportScreenState extends ConsumerState<ReportScreen> with SingleTickerPr
                     fontSize: 20,
                     fontWeight: FontWeight.bold,
                   ),
+                ),
+                const SizedBox(width: 8),
+                IconButton(
+                  icon: const Icon(Icons.refresh, size: 20, color: Colors.blue),
+                  onPressed: () => ref.read(reportProvider.notifier).refreshReports(),
+                  tooltip: 'تحديث',
                 ),
                 const Spacer(),
                 
@@ -660,13 +675,13 @@ class _ReportScreenState extends ConsumerState<ReportScreen> with SingleTickerPr
               value: '${report.reportDate.year}/${report.reportDate.month.toString().padLeft(2, '0')}/${report.reportDate.day.toString().padLeft(2, '0')}',
             ),
             
-            if (report.description?.isNotEmpty ?? false) ...[
+            if (report.description.isNotEmpty) ...[
               const SizedBox(height: 16),
               _buildDetailItem(
                 context,
                 icon: Icons.description,
                 label: 'وصف إضافي',
-                value: report.description!,
+                value: report.description,
               ),
             ],
             
@@ -786,7 +801,7 @@ class _ReportScreenState extends ConsumerState<ReportScreen> with SingleTickerPr
         _undoTimer?.cancel();
         
         // حذف البلاغ محلياً فقط
-        final currentList = notifier.deleteReportLocally(report.id);
+        notifier.deleteReportLocally(report.id);
         
         if (!context.mounted) return;
         

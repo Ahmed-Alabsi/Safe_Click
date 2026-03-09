@@ -55,52 +55,23 @@ class ReportApi {
     }
   }
 
-  // ✅ دالة حذف بلاغ فردي مع استخدام API Client
+  // ✅ دالة حذف بلاغ فردي (Soft Delete)
   Future<Map<String, dynamic>> deleteReport(String reportId) async {
     try {
-      // استخدام Dio لحذف البلاغ
-      final response = await _client.dio.delete('/reports/$reportId/');
+      final response = await _client.dio.post('/reports/$reportId/delete-soft/');
       return response.data;
     } catch (e) {
-      // معالجة الخطأ باستخدام handleDioError
-      final errorResponse = _client.handleDioError(e);
-      
-      // ✅ حل مؤقت للاختبار: إذا فشل الاتصال بالخادم، نستخدم المحاكاة
-      if (errorResponse['success'] == false) {
-        // محاكاة نجاح العملية للاختبار
-        await Future.delayed(const Duration(milliseconds: 500));
-        return {
-          'success': true, 
-          'message': 'تم حذف البلاغ بنجاح (محاكاة)',
-          'id': reportId
-        };
-      }
-      
-      return errorResponse;
+      return _client.handleDioError(e);
     }
   }
 
-  // ✅ دالة حذف جميع البلاغات مع استخدام API Client
+  // ✅ دالة حذف جميع البلاغات (Soft Delete)
   Future<Map<String, dynamic>> deleteAllReports() async {
     try {
-      // استخدام Dio لحذف جميع البلاغات
-      final response = await _client.dio.delete('/reports/delete-all/');
+      final response = await _client.dio.post('/reports/clear-all-soft/');
       return response.data;
     } catch (e) {
-      // معالجة الخطأ باستخدام handleDioError
-      final errorResponse = _client.handleDioError(e);
-      
-      // ✅ حل مؤقت للاختبار: إذا فشل الاتصال بالخادم، نستخدم المحاكاة
-      if (errorResponse['success'] == false) {
-        // محاكاة نجاح العملية للاختبار
-        await Future.delayed(const Duration(milliseconds: 500));
-        return {
-          'success': true, 
-          'message': 'تم حذف جميع البلاغات بنجاح (محاكاة)',
-        };
-      }
-      
-      return errorResponse;
+      return _client.handleDioError(e);
     }
   }
 

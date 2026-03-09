@@ -492,6 +492,17 @@ class ScanCacheService {
     }
   }
 
+  /// REAL delete (hard delete) of all scans. Used during full sync from server.
+  Future<void> hardDeleteAllScans() async {
+    try {
+      final db = await _database;
+      await db.delete(_scansTable);
+      debugPrint('🗑️ [LocalDB] Hard deleted all scans for sync');
+    } catch (e) {
+      debugPrint('⚠️ [LocalDB] hardDeleteAllScans error: $e');
+    }
+  }
+
   /// Clears both url_cache and scans history. Useful for user logout / data reset.
   Future<void> clearAll() async {
     await clearUrlCache();

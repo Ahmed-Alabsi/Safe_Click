@@ -156,10 +156,13 @@ class ScanRepositoryImpl implements ScanRepository {
             .map((data) => _toEntity(ScanResult.fromJson(data)))
             .toList();
         
+        // Clear local history to ensure it matches remote state exactly
+        await _cache.hardDeleteAllScans();
+        
         // Convert to models for storage
         final models = entities.map(_toModel).toList();
         final modelsData = models.map((m) => m.toJson()).toList().cast<Map<String, dynamic>>();
-        
+
         // Save to SQLite
         await _cache.saveScansHistory(modelsData);
         debugPrint('🔄 [History] Synced ${modelsData.length} records from server to SQLite');
@@ -173,11 +176,14 @@ class ScanRepositoryImpl implements ScanRepository {
     return [];
   }
 
-  @override
   Future<bool> softDeleteScan(String id) async {
     try {
       await _cache.softDeleteScan(id);
-      debugPrint('✅ [SoftDelete] Scan hidden from user: $id');
+      
+      // Sync with server
+      final response = await _remote.deleteScan(id);
+      debugPrint('✅ [SoftDelete] Scan hidden from user (Remote: ${response['success']}): $id');
+      
       return true;
     } catch (e) {
       debugPrint('🔴 [SoftDelete] Failed: $e');
@@ -189,7 +195,11 @@ class ScanRepositoryImpl implements ScanRepository {
   Future<bool> clearUserHistory() async {
     try {
       await _cache.clearUserHistory();
-      debugPrint('✅ [SoftDelete] All scans hidden from user');
+      
+      // Sync with server
+      final response = await _remote.clearHistory();
+      debugPrint('✅ [SoftDelete] All scans hidden from user (Remote: ${response['success']})');
+      
       return true;
     } catch (e) {
       debugPrint('🔴 [SoftDelete] Clear failed: $e');

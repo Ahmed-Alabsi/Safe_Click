@@ -1,6 +1,7 @@
 ﻿import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:safeclik/core/network/report_api.dart';
 import 'package:safeclik/features/report/data/models/report_model.dart';
+import 'package:safeclik/features/auth/presentation/providers/auth_controller.dart';
 import 'package:safeclik/core/di/di.dart';
 import 'package:flutter/foundation.dart';
 
@@ -18,6 +19,13 @@ class ReportNotifier extends AsyncNotifier<List<ReportModel>> {
 
   @override
   Future<List<ReportModel>> build() async {
+    // Watch userId to trigger a rebuild (and re-fetch) when the user changes
+    final userId = ref.watch(authProvider.select((auth) => auth.user?.id));
+    
+    if (userId == null) {
+      return [];
+    }
+    
     return _fetchMyReports();
   }
 
@@ -81,43 +89,22 @@ class ReportNotifier extends AsyncNotifier<List<ReportModel>> {
   // ✅ دالة حذف بلاغ فردي
   Future<bool> deleteReport(String reportId) async {
     try {
-      // تحديث حالة التحميل
-      state = const AsyncValue.loading();
-      
       debugPrint('🔵 حذف بلاغ: $reportId');
       
-      // استدعاء API لحذف البلاغ
       final response = await _reportApi.deleteReport(reportId);
       
-      debugPrint('📥 الرد: $response');
-      
       if (response['success'] == true) {
-        // جلب البلاغات المحدثة بعد الحذف
+        // تحديث القائمة بعد الحذف الناجح
         final updatedReports = await _fetchMyReports();
         state = AsyncValue.data(updatedReports);
-        
         return true;
       } else {
         _lastError = response['message'] ?? 'فشل حذف البلاغ';
-        
-        // إعادة تحميل البلاغات في حالة الفشل
-        final currentReports = await _fetchMyReports();
-        state = AsyncValue.data(currentReports);
-        
         return false;
       }
     } catch (e) {
       debugPrint('❌ خطأ في حذف البلاغ: $e');
       _lastError = 'حدث خطأ في الاتصال بالخادم';
-      
-      // إعادة تحميل البلاغات في حالة الخطأ
-      try {
-        final currentReports = await _fetchMyReports();
-        state = AsyncValue.data(currentReports);
-      } catch (fetchError) {
-        state = AsyncValue.data([]);
-      }
-      
       return false;
     }
   }
@@ -125,41 +112,20 @@ class ReportNotifier extends AsyncNotifier<List<ReportModel>> {
   // ✅ دالة حذف جميع البلاغات
   Future<bool> clearAllReports() async {
     try {
-      // تحديث حالة التحميل
-      state = const AsyncValue.loading();
-      
       debugPrint('🔵 حذف جميع البلاغات');
       
-      // استدعاء API لحذف جميع البلاغات
       final response = await _reportApi.deleteAllReports();
       
-      debugPrint('📥 الرد: $response');
-      
       if (response['success'] == true) {
-        // تفريغ القائمة محلياً
         state = const AsyncValue.data([]);
         return true;
       } else {
         _lastError = response['message'] ?? 'فشل حذف جميع البلاغات';
-        
-        // إعادة تحميل البلاغات في حالة الفشل
-        final currentReports = await _fetchMyReports();
-        state = AsyncValue.data(currentReports);
-        
         return false;
       }
     } catch (e) {
       debugPrint('❌ خطأ في حذف جميع البلاغات: $e');
       _lastError = 'حدث خطأ في الاتصال بالخادم';
-      
-      // إعادة تحميل البلاغات في حالة الخطأ
-      try {
-        final currentReports = await _fetchMyReports();
-        state = AsyncValue.data(currentReports);
-      } catch (fetchError) {
-        state = AsyncValue.data([]);
-      }
-      
       return false;
     }
   }

@@ -1,6 +1,7 @@
 ﻿import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:safeclik/features/auth/presentation/providers/auth_controller.dart';
+import 'package:safeclik/features/auth/presentation/pages/verify_email_screen.dart';
 
 class RegisterScreen extends ConsumerStatefulWidget {
   const RegisterScreen({super.key});
@@ -56,7 +57,15 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
       if (!context.mounted) return;
       
       if (success) {
-        Navigator.pushReplacementNamed(context, '/home');
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => VerifyEmailScreen(
+              email: _emailController.text.trim(),
+              password: _passwordController.text,
+            ),
+          ),
+        );
       } else if (notifier.error != null) {
         ScaffoldMessenger.of(context).clearSnackBars();
         ScaffoldMessenger.of(context).showSnackBar(

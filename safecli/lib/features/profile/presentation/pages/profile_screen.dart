@@ -2,6 +2,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:safeclik/features/auth/presentation/providers/auth_controller.dart';
 import 'package:safeclik/features/scan/presentation/controllers/scan_notifier.dart';
+import 'package:safeclik/features/auth/presentation/pages/login_screen.dart';
 import 'edit_profile_screen.dart';
 
 // لا حاجة لتعريف كلاس User منفصل
@@ -145,12 +146,12 @@ Widget _buildProfileHeader(BuildContext context, dynamic user, ThemeData theme) 
                       child: CircleAvatar(
                         radius: 55,
                         backgroundColor: theme.colorScheme.surface,
-                        backgroundImage: user.profileImage != null
+                        backgroundImage: user != null && user.profileImage != null
                             ? NetworkImage(user.fullProfileImageUrl!)
                             : null,
-                        child: user.profileImage == null
+                        child: user == null || user.profileImage == null
                             ? Text(
-                                user.name.isNotEmpty ? user.name[0].toUpperCase() : '?',
+                                (user?.name != null && user!.name.isNotEmpty) ? user.name[0].toUpperCase() : '?',
                                 style: TextStyle(
                                   fontSize: 40,
                                   color: theme.colorScheme.primary,
@@ -168,9 +169,9 @@ Widget _buildProfileHeader(BuildContext context, dynamic user, ThemeData theme) 
                       child: Container(
                         padding: const EdgeInsets.all(6),
                         decoration: BoxDecoration(
-                          color: user.isEmailVerified 
-                              ? Colors.green 
-                              : Colors.orange,
+                          color: (user?.isEmailVerified ?? false)
+                               ? Colors.green 
+                               : Colors.orange,
                           shape: BoxShape.circle,
                           border: Border.all(color: Colors.white, width: 2.5),
                           boxShadow: [
@@ -182,7 +183,7 @@ Widget _buildProfileHeader(BuildContext context, dynamic user, ThemeData theme) 
                           ],
                         ),
                         child: Icon(
-                          user.isEmailVerified 
+                          (user?.isEmailVerified ?? false)
                               ? Icons.check_rounded 
                               : Icons.access_time_rounded,
                           color: Colors.white,
@@ -198,7 +199,7 @@ Widget _buildProfileHeader(BuildContext context, dynamic user, ThemeData theme) 
               
               // اسم المستخدم
               Text(
-                user.name,
+                user?.name ?? '',
                 style: theme.textTheme.headlineSmall?.copyWith(
                   color: Colors.white,
                   fontWeight: FontWeight.bold,
@@ -231,7 +232,7 @@ Widget _buildProfileHeader(BuildContext context, dynamic user, ThemeData theme) 
                     ),
                     const SizedBox(width: 8),
                     Text(
-                      user.email,
+                      user?.email ?? '',
                       style: theme.textTheme.bodyMedium?.copyWith(
                         color: Colors.white.withValues(alpha: 0.9),
                       ),
@@ -594,7 +595,9 @@ Padding(
         child: Material(
           color: Colors.transparent,
           child: InkWell(
-            onTap: () => _showLogoutDialog(context, ref),
+            onTap: () async {
+              _showLogoutDialog(context, ref);
+            },
             borderRadius: BorderRadius.circular(16),
             child: Center(
               child: Row(
@@ -733,10 +736,16 @@ Padding(
           ),
           ElevatedButton(
             onPressed: () async {
+              // 1. Perform the logout (tokens, state)
               ref.read(scanNotifierProvider.notifier).reset();
               await ref.read(authProvider.notifier).logout();
+              
+              // 2. Reset the navigation stack and redirect to Login
               if (context.mounted) {
-                Navigator.pop(context);
+                Navigator.of(context).pushAndRemoveUntil(
+                  MaterialPageRoute(builder: (_) => LoginScreen()),
+                  (route) => false,
+                );
               }
             },
             style: ElevatedButton.styleFrom(
