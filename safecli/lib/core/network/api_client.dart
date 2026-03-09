@@ -7,6 +7,10 @@ import 'package:dio/dio.dart';
 import 'package:device_info_plus/device_info_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+// مفاتيح التخزين الآمن
+const _kAccessToken = 'access_token';
+const _kRefreshToken = 'refresh_token';
+
 class ApiClient {
   static String? _baseUrlOverride;
   
@@ -16,11 +20,17 @@ class ApiClient {
   }
 
   String? _cachedToken;
+  String? _cachedRefreshToken;
+  
   static final _secureStorage = const FlutterSecureStorage(
     aOptions: AndroidOptions(encryptedSharedPreferences: true),
   );
 
   late final Dio dio;
+  
+  // Stream للتنبيه عند انتهاء التوكن
+  final _tokenExpiredController = StreamController<bool>.broadcast();
+  Stream<bool> get onTokenExpired => _tokenExpiredController.stream;
 
   ApiClient() {
     dio = Dio(BaseOptions(
@@ -30,15 +40,50 @@ class ApiClient {
       headers: {'Content-Type': 'application/json'},
     ));
 
+    // تحميل التوكنات عند إنشاء الكلاس
+    _loadTokens();
+
     // Token injection interceptor
     dio.interceptors.add(InterceptorsWrapper(
       onRequest: (options, handler) async {
         dio.options.baseUrl = baseUrl;
-        _cachedToken ??= await _secureStorage.read(key: 'access_token');
+        
+        // استخدام التوكن المخزن مؤقتاً
         if (_cachedToken != null) {
           options.headers['Authorization'] = 'Bearer $_cachedToken';
+          debugPrint('🔑 [ApiClient] إضافة توكن للطلب: ${_cachedToken!.substring(0, _cachedToken!.length > 20 ? 20 : _cachedToken!.length)}...');
+        } else {
+          debugPrint('🔑 [ApiClient] لا يوجد توكن للطلب');
         }
+        
         return handler.next(options);
+      },
+      onError: (error, handler) async {
+        // إذا كان الخطأ 401 (Unauthorized) - التوكن منتهي
+        if (error.response?.statusCode == 401) {
+          debugPrint('🔄 [ApiClient] توكن منتهي، محاولة التحديث...');
+          
+          // محاولة تحديث التوكن
+          final newToken = await _refreshAccessToken();
+          
+          if (newToken != null) {
+            // إعادة المحاولة بالتوكن الجديد
+            final options = error.requestOptions;
+            options.headers['Authorization'] = 'Bearer $newToken';
+            
+            try {
+              final response = await dio.fetch(options);
+              return handler.resolve(response);
+            } catch (e) {
+              debugPrint('❌ [ApiClient] فشل إعادة المحاولة بعد تحديث التوكن: $e');
+            }
+          }
+          
+          // إذا فشل التحديث، أرسل إشارة بانتهاء التوكن
+          _tokenExpiredController.add(true);
+        }
+        
+        return handler.next(error);
       },
     ));
 
@@ -53,6 +98,84 @@ class ApiClient {
           logPrint: (msg) => debugPrint('🌐 [Dio] $msg'),
         ),
       );
+    }
+  }
+
+  // تحميل التوكنات من التخزين الآمن
+  Future<void> _loadTokens() async {
+    try {
+      _cachedToken = await _secureStorage.read(key: _kAccessToken);
+      _cachedRefreshToken = await _secureStorage.read(key: _kRefreshToken);
+      
+      if (_cachedToken != null) {
+        debugPrint('✅ [ApiClient] تم تحميل التوكن من التخزين الآمن');
+      }
+    } catch (e) {
+      debugPrint('❌ [ApiClient] خطأ في تحميل التوكنات: $e');
+    }
+  }
+
+  // حفظ التوكنات في التخزين الآمن والذاكرة المؤقتة
+  Future<void> saveTokens(String accessToken, String refreshToken) async {
+    try {
+      // حفظ في الذاكرة المؤقتة
+      _cachedToken = accessToken;
+      _cachedRefreshToken = refreshToken;
+      
+      // حفظ في التخزين الآمن
+      await _secureStorage.write(key: _kAccessToken, value: accessToken);
+      await _secureStorage.write(key: _kRefreshToken, value: refreshToken);
+      
+      debugPrint('✅ [ApiClient] تم حفظ التوكنات بنجاح');
+    } catch (e) {
+      debugPrint('❌ [ApiClient] خطأ في حفظ التوكنات: $e');
+    }
+  }
+
+  // تحديث التوكن
+  Future<String?> _refreshAccessToken() async {
+    if (_cachedRefreshToken == null) {
+      debugPrint('❌ [ApiClient] لا يوجد refresh token');
+      return null;
+    }
+    
+    try {
+      debugPrint('🔄 [ApiClient] محاولة تحديث التوكن...');
+      
+      final response = await dio.post(
+        '/auth/token/refresh/',
+        data: {'refresh': _cachedRefreshToken},
+      );
+      
+      if (response.statusCode == 200) {
+        final newAccessToken = response.data['access'];
+        
+        // حفظ التوكن الجديد
+        _cachedToken = newAccessToken;
+        await _secureStorage.write(key: _kAccessToken, value: newAccessToken);
+        
+        debugPrint('✅ [ApiClient] تم تحديث التوكن بنجاح');
+        return newAccessToken;
+      }
+    } catch (e) {
+      debugPrint('❌ [ApiClient] فشل تحديث التوكن: $e');
+    }
+    
+    return null;
+  }
+
+  // مسح التوكنات (تسجيل الخروج)
+  Future<void> clearTokens() async {
+    try {
+      _cachedToken = null;
+      _cachedRefreshToken = null;
+      
+      await _secureStorage.delete(key: _kAccessToken);
+      await _secureStorage.delete(key: _kRefreshToken);
+      
+      debugPrint('🗑️ [ApiClient] تم مسح التوكنات');
+    } catch (e) {
+      debugPrint('❌ [ApiClient] خطأ في مسح التوكنات: $e');
     }
   }
 
@@ -94,10 +217,26 @@ class ApiClient {
     }
   }
 
-  void cacheToken(String? token) => _cachedToken = token;
+  void cacheToken(String? token) {
+    _cachedToken = token;
+    if (token != null) {
+      debugPrint('🔑 [ApiClient] تحديث التوكن في الذاكرة المؤقتة');
+    }
+  }
+
+  // التحقق من حالة التوكن
+  bool get hasValidToken => _cachedToken != null && _cachedToken!.isNotEmpty;
 
   Map<String, dynamic> handleDioError(dynamic e) {
     if (e is DioException) {
+      // إذا كان الخطأ 401 (Unauthorized) - توكن منتهي
+      if (e.response?.statusCode == 401) {
+        return {
+          'success': false, 
+          'message': 'انتهت صلاحية الجلسة، الرجاء تسجيل الدخول مرة أخرى'
+        };
+      }
+      
       if (e.type == DioExceptionType.connectionTimeout) {
         return {'success': false, 'message': 'انتهت مهلة الاتصال - تأكد من تشغيل السيرفر وعنوان الـ IP'};
       }

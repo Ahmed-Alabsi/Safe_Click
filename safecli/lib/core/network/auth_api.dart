@@ -10,6 +10,9 @@ class AuthApi {
 
   AuthApi(this._client);
 
+  // ========== المصادقة ==========
+
+  /// تسجيل مستخدم جديد (إرسال OTP)
   Future<Map<String, dynamic>> register({
     required String name,
     required String email,
@@ -34,6 +37,7 @@ class AuthApi {
     }
   }
 
+  /// التحقق من رمز OTP
   Future<Map<String, dynamic>> verifyOtp({
     required String email,
     required String otp,
@@ -44,16 +48,20 @@ class AuthApi {
         'otp': otp,
       });
       final data = response.data;
+      
       if (data['success'] == true) {
         // If tokens are returned (direct login after registration)
         if (data['tokens'] != null) {
           final access = data['tokens']['access'] as String?;
           final refresh = data['tokens']['refresh'] as String?;
+          
           if (access != null) {
             await _secureStorage.write(key: 'access_token', value: access);
             _client.cacheToken(access);
           }
-          if (refresh != null) await _secureStorage.write(key: 'refresh_token', value: refresh);
+          if (refresh != null) {
+            await _secureStorage.write(key: 'refresh_token', value: refresh);
+          }
         }
         return {'success': true, 'data': data};
       }
@@ -67,6 +75,7 @@ class AuthApi {
     }
   }
 
+  /// إعادة إرسال رمز OTP
   Future<Map<String, dynamic>> resendOtp(String email) async {
     try {
       final response = await _client.dio.post('/auth/resend-otp/', data: {'email': email});
@@ -80,6 +89,7 @@ class AuthApi {
     }
   }
 
+  /// تسجيل الدخول
   Future<Map<String, dynamic>> login({
     required String username,
     required String password,
@@ -90,14 +100,18 @@ class AuthApi {
         'password': password,
       });
       final data = response.data;
+      
       if (response.statusCode == 200 && data['success'] == true) {
         final access = data['tokens']['access'] as String?;
         final refresh = data['tokens']['refresh'] as String?;
+        
         if (access != null) {
           await _secureStorage.write(key: 'access_token', value: access);
           _client.cacheToken(access);
         }
-        if (refresh != null) await _secureStorage.write(key: 'refresh_token', value: refresh);
+        if (refresh != null) {
+          await _secureStorage.write(key: 'refresh_token', value: refresh);
+        }
         return data;
       }
       return data;
@@ -110,6 +124,7 @@ class AuthApi {
     }
   }
 
+  /// تسجيل الخروج
   Future<Map<String, dynamic>> logout() async {
     try {
       final refreshToken = await _secureStorage.read(key: 'refresh_token');
@@ -126,20 +141,41 @@ class AuthApi {
     }
   }
 
+  // ========== الملف الشخصي ==========
+
+  /// جلب بيانات الملف الشخصي
   Future<Map<String, dynamic>> getProfile() async {
     try {
+      // التحقق من وجود توكن
+      final token = await _secureStorage.read(key: 'access_token');
+      if (token == null) {
+        return {'success': false, 'message': 'لا يوجد توكن صالح'};
+      }
+      
       final response = await _client.dio.get('/auth/profile/');
-      return response.data;
-    } catch (e) {
+      return {'success': true, 'user': response.data};
+    } on DioException catch (e) {
+      // إذا كان الخطأ 401 (Unauthorized)، التوكن منتهي
+      if (e.response?.statusCode == 401) {
+        // مسح التوكنات المنتهية
+        await _secureStorage.delete(key: 'access_token');
+        await _secureStorage.delete(key: 'refresh_token');
+        _client.cacheToken(null);
+        return {'success': false, 'message': 'انتهت صلاحية الجلسة، الرجاء تسجيل الدخول مجدداً'};
+      }
       return _client.handleDioError(e);
+    } catch (e) {
+      return {'success': false, 'message': e.toString()};
     }
   }
 
+  /// تحديث الملف الشخصي
   Future<Map<String, dynamic>> updateProfile({String? name, String? email}) async {
     try {
       final body = <String, dynamic>{};
       if (name != null) body['name'] = name;
       if (email != null) body['email'] = email;
+      
       final response = await _client.dio.patch('/auth/profile/', data: body);
       return response.data;
     } catch (e) {
@@ -147,6 +183,7 @@ class AuthApi {
     }
   }
 
+  /// تحديث صورة الملف الشخصي
   Future<Map<String, dynamic>> updateProfileImage(String imagePath) async {
     try {
       final formData = FormData.fromMap({
@@ -159,6 +196,9 @@ class AuthApi {
     }
   }
 
+  // ========== كلمة المرور ==========
+
+  /// تغيير كلمة المرور
   Future<Map<String, dynamic>> changePassword({
     required String oldPassword,
     required String newPassword,
@@ -176,6 +216,7 @@ class AuthApi {
     }
   }
 
+  /// طلب إعادة تعيين كلمة المرور (نسيت كلمة المرور)
   Future<Map<String, dynamic>> forgotPassword(String email) async {
     try {
       final response = await _client.dio.post('/auth/forgot-password/', data: {'email': email});
@@ -188,6 +229,7 @@ class AuthApi {
     }
   }
 
+  /// التحقق من رمز إعادة تعيين كلمة المرور
   Future<Map<String, dynamic>> verifyResetOtp({
     required String email,
     required String otp,
@@ -206,6 +248,7 @@ class AuthApi {
     }
   }
 
+  /// إعادة تعيين كلمة المرور
   Future<Map<String, dynamic>> resetPassword({
     required String email,
     required String otp,
@@ -217,6 +260,21 @@ class AuthApi {
         'otp': otp,
         'password': password,
       });
+      
+      // إذا نجحت إعادة التعيين، قد يتم إرجاع توكنات
+      if (response.data['tokens'] != null) {
+        final access = response.data['tokens']['access'] as String?;
+        final refresh = response.data['tokens']['refresh'] as String?;
+        
+        if (access != null) {
+          await _secureStorage.write(key: 'access_token', value: access);
+          _client.cacheToken(access);
+        }
+        if (refresh != null) {
+          await _secureStorage.write(key: 'refresh_token', value: refresh);
+        }
+      }
+      
       return response.data;
     } catch (e) {
       if (e is DioException && e.response != null) {

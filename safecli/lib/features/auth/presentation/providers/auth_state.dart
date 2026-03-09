@@ -1,9 +1,3 @@
-// lib/features/auth/presentation/providers/auth_state.dart
-//
-// Reactive AuthState for Riverpod StateNotifier.
-// All fields — including initialization status and error — are part of
-// the state object, ensuring the UI rebuilds correctly on every change.
-
 import 'package:safeclik/features/auth/data/models/user_model.dart';
 
 class AuthState {
@@ -11,21 +5,24 @@ class AuthState {
   final bool isLoading;
   final UserModel? user;
   final String? error;
+  final bool hasToken;
 
   const AuthState({
     this.isInitializing = true,
     this.isLoading = false,
     this.user,
     this.error,
+    this.hasToken = false,
   });
 
-  bool get isAuthenticated => user != null;
+  bool get isAuthenticated => user != null || hasToken;
 
   AuthState copyWith({
     bool? isInitializing,
     bool? isLoading,
     UserModel? user,
     String? error,
+    bool? hasToken,
     bool clearError = false,
     bool clearUser = false,
   }) {
@@ -34,6 +31,7 @@ class AuthState {
       isLoading: isLoading ?? this.isLoading,
       user: clearUser ? null : (user ?? this.user),
       error: clearError ? null : (error ?? this.error),
+      hasToken: hasToken ?? this.hasToken,
     );
   }
 

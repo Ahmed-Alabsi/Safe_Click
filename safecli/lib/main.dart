@@ -27,6 +27,7 @@ import 'package:safeclik/features/report/presentation/pages/report_screen.dart';
 import 'package:safeclik/features/settings/presentation/pages/settings_screen.dart';
 import 'package:safeclik/features/auth/presentation/pages/forgot_password_screen.dart';
 
+
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
@@ -147,28 +148,27 @@ class _MyAppState extends ConsumerState<MyApp> {
     final isDarkMode = settingsAsyncValue.value?.darkMode ?? false;
 
     return MaterialApp(
-      title: 'SafeClik',
+      title: 'Safe Click',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.lightTheme,
       darkTheme: AppTheme.darkTheme,
       themeMode: isDarkMode ? ThemeMode.dark : ThemeMode.light,
       home: Consumer(
-        builder: (context, ref, child) {
-          final authState = ref.watch(authProvider);
-          
-          if (authState.isInitializing) {
-            return const SplashScreen();
-          }
+  builder: (context, ref, child) {
+    final authState = ref.watch(authProvider);
+    
+    if (authState.isInitializing) {
+      return const SplashScreen();
+    }
 
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            _handlePendingLink(context);
-          });
-
-          return authState.isAuthenticated
-              ? const HomeScreen()
-              : const LoginScreen();
-        },
-      ),
+    // ✅ هذا هو الشرط الحاسم
+    if (authState.isAuthenticated) {
+      return const HomeScreen();  // إذا كان هناك توكن أو مستخدم → الرئيسية
+    } else {
+      return const LoginScreen(); // إذا لا → تسجيل الدخول
+    }
+  },
+),
       routes: {
         '/login': (context) => const LoginScreen(),
         '/register': (context) => const RegisterScreen(),

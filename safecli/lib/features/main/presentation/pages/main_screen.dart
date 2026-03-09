@@ -6,6 +6,7 @@ import 'package:safeclik/features/profile/presentation/widgets/stats_card.dart';
 import 'package:safeclik/features/scan/presentation/pages/result_screen.dart';
 import 'dart:io';
 import 'dart:async';
+import 'package:dio/dio.dart';
 
 class MainScreen extends ConsumerStatefulWidget {
   const MainScreen({super.key});
@@ -41,26 +42,102 @@ class _MainScreenState extends ConsumerState<MainScreen> with TickerProviderStat
     _animationController.dispose();
     super.dispose();
   }
-Future<bool> _checkInternetConnectivity() async {
-  try {
-    final result = await InternetAddress.lookup('google.com');
-    return result.isNotEmpty && result[0].rawAddress.isNotEmpty;
-  } on SocketException catch (_) {
-    return false;
-  }
-}
 
-Future<bool> _checkInternetSpeed() async {
-  try {
-    final stopwatch = Stopwatch()..start();
-    await InternetAddress.lookup('google.com').timeout(const Duration(seconds: 3));
-    stopwatch.stop();
-    // إذا استغرق الرد أكثر من 2 ثانية، نعتبر النت بطيء
-    return stopwatch.elapsedMilliseconds < 4000;
-  } catch (_) {
-    return false;
+  Future<bool> _checkInternetConnectivity() async {
+    try {
+      final result = await InternetAddress.lookup('google.com');
+      return result.isNotEmpty && result[0].rawAddress.isNotEmpty;
+    } on SocketException catch (_) {
+      return false;
+    }
   }
-}
+
+  Future<bool> _checkInternetSpeed() async {
+    try {
+      final stopwatch = Stopwatch()..start();
+      await InternetAddress.lookup('google.com').timeout(const Duration(seconds: 3));
+      stopwatch.stop();
+      // إذا استغرق الرد أكثر من 2 ثانية، نعتبر النت بطيء
+      return stopwatch.elapsedMilliseconds < 4000;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// دالة لمعالجة أخطاء السيرفر وإظهار رسائل مناسبة
+  String _getUserFriendlyErrorMessage(dynamic error, String? lastError) {
+    // إذا كان هناك خطأ محدد من الـ API
+    if (lastError != null && lastError.isNotEmpty) {
+      // قائمة بالأخطاء التي يمكن عرضها كما هي
+      final safeErrors = [
+        'الرابط غير صالح',
+        'الرابط لا يمكن الوصول إليه',
+        'تم حظر هذا الموقع',
+        'تم الإبلاغ عن هذا الرابط كضار',
+        'الرجاء تسجيل الدخول أولاً',
+      ];
+      
+      // إذا كان الخطأ من القائمة الآمنة، نعرضه كما هو
+      for (final safeError in safeErrors) {
+        if (lastError.contains(safeError)) {
+          return lastError;
+        }
+      }
+    }
+    
+    // التحقق من أنواع الأخطاء المعروفة
+    if (error is DioException) {
+      if (error.type == DioExceptionType.connectionTimeout ||
+          error.type == DioExceptionType.receiveTimeout ||
+          error.type == DioExceptionType.sendTimeout) {
+        return 'مشكلة في الاتصال بالسيرفر، يرجى المحاولة لاحقاً';
+      }
+      
+      if (error.type == DioExceptionType.connectionError) {
+        return 'تعذر الاتصال بالسيرفر، تأكد من اتصالك بالإنترنت';
+      }
+      
+      if (error.response?.statusCode != null) {
+        final statusCode = error.response!.statusCode!;
+        
+        // أخطاء السيرفر (5xx)
+        if (statusCode >= 500) {
+          return 'مشكلة في السيرفر، يرجى المحاولة لاحقاً';
+        }
+        
+        // أخطاء المصادقة (401, 403)
+        if (statusCode == 401 || statusCode == 403) {
+          return 'مشكلة في صلاحية الدخول، يرجى تسجيل الدخول مرة أخرى';
+        }
+        
+        // أخطاء أخرى (4xx)
+        if (statusCode >= 400) {
+          return 'مشكلة في الطلب، يرجى التحقق من الرابط والمحاولة مرة أخرى';
+        }
+      }
+    }
+    
+    // إذا كان الخطأ يتعلق بالشبكة
+    if (error is SocketException) {
+      return 'مشكلة في الاتصال بالإنترنت، تحقق من شبكتك';
+    }
+    
+    if (error is TimeoutException) {
+      return 'انتهت مهلة الاتصال بالسيرفر، يرجى المحاولة لاحقاً';
+    }
+    
+    // إذا كان الخطأ يتعلق بالسيرفر من النص
+    if (error.toString().contains('server') || 
+        error.toString().contains('Server') ||
+        error.toString().contains('500') ||
+        error.toString().contains('503')) {
+      return 'مشكلة في السيرفر، يرجى المحاولة لاحقاً';
+    }
+    
+    // رسالة افتراضية عامة
+    return 'حدثت مشكلة في السيرفر، يرجى المحاولة لاحقاً';
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -73,8 +150,6 @@ Future<bool> _checkInternetSpeed() async {
               _buildHeader(),
               const SizedBox(height: 30),
               _buildScanCard(),
-              const SizedBox(height: 20),
-              _buildErrorWidget(),
               const SizedBox(height: 30),
               _buildStats(),
             ],
@@ -264,36 +339,6 @@ Future<bool> _checkInternetSpeed() async {
     );
   }
 
-  Widget _buildErrorWidget() {
-    final scanState = ref.watch(scanNotifierProvider);
-    if (scanState.lastError == null) return const SizedBox.shrink();
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.errorContainer,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Theme.of(context).colorScheme.error),
-      ),
-      child: Row(
-        children: [
-          Icon(Icons.error_outline, color: Theme.of(context).colorScheme.onErrorContainer),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Text(
-              scanState.lastError!,
-              style: TextStyle(color: Theme.of(context).colorScheme.onErrorContainer),
-            ),
-          ),
-          IconButton(
-            icon: const Icon(Icons.close, size: 20),
-            onPressed: () => ref.read(scanNotifierProvider.notifier).clearError(),
-          ),
-        ],
-      ),
-    );
-  }
-
-
   Widget _buildStats() {
     final scanState = ref.watch(scanNotifierProvider);
     final h = scanState.scanHistory;
@@ -307,133 +352,180 @@ Future<bool> _checkInternetSpeed() async {
   }
 
   Future<void> _performScan(BuildContext context) async {
-  if (ref.read(scanNotifierProvider).isScanning) return;
+    if (ref.read(scanNotifierProvider).isScanning) return;
 
-  if (_linkController.text.trim().isEmpty) {
-    ScaffoldMessenger.of(context).clearSnackBars();
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: const Text('يرجى إدخال رابط لفحصه'),
-        backgroundColor: Theme.of(context).colorScheme.error,
-        behavior: SnackBarBehavior.floating,
-      ),
-    );
-    return;
-  }
-
-  // التحقق من الاتصال بالإنترنت
-  final hasInternet = await _checkInternetConnectivity();
-  if (!hasInternet) {
-    if (!context.mounted) return;
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        icon: Icon(
-          Icons.wifi_off_rounded,
-          color: Theme.of(context).colorScheme.error,
-          size: 48,
-        ),
-        title: const Text('لا يوجد اتصال بالإنترنت'),
-        content: const Text(
-          'يرجى التحقق من اتصالك بالإنترنت والمحاولة مرة أخرى.\n\n'
-          'تأكد من:'
-          '\n• تفعيل الواي فاي أو البيانات'
-          '\n• استقرار الشبكة'
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('حسناً'),
-          ),
-        ],
-      ),
-    );
-    return;
-  }
-
-  // التحقق من سرعة الإنترنت
-  final isSpeedGood = await _checkInternetSpeed();
-  if (!isSpeedGood) {
-    if (!context.mounted) return;
-    final proceed = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        icon: Icon(
-          Icons.speed,
-          color: Colors.orange,
-          size: 48,
-        ),
-        title: const Text('اتصال الإنترنت بطيء'),
-        content: const Text(
-          'اتصال الإنترنت الحالي بطيء وقد يستغرق الفحص وقتاً أطول من المعتاد.\n\n'
-          'هل تريد المتابعة على أي حال؟'
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('إلغاء'),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.orange,
-              foregroundColor: Colors.white,
-            ),
-            child: const Text('متابعة على أي حال'),
-          ),
-        ],
-      ),
-    );
-    
-    if (!context.mounted || proceed != true) return;
-    
-    // عرض مؤشر مع رسالة توضيحية
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: const Row(
-          children: [
-            Icon(Icons.warning_amber, color: Colors.white, size: 20),
-            SizedBox(width: 8),
-            Expanded(child: Text('جاري الفحص... قد يستغرق وقتاً أطول بسبب بطء الاتصال')),
-          ],
-        ),
-        backgroundColor: Colors.orange,
-        behavior: SnackBarBehavior.floating,
-        duration: const Duration(seconds: 3),
-      ),
-    );
-  }
-
-  // محاولة الفحص مع timeout
-  try {
-    final result = await ref
-        .read(scanNotifierProvider.notifier)
-        .scanLink(_linkController.text.trim())
-        .timeout(
-          const Duration(seconds: 30),
-          onTimeout: () {
-            throw TimeoutException('استغرق الفحص وقتاً طويلاً');
-          },
-        );
-
-    if (!context.mounted) return;
-
-    if (result != null) {
-      _linkController.clear();
-      _linkFocusNode.unfocus();
-      Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (context) => ResultScreen(scanResult: result),
+    if (_linkController.text.trim().isEmpty) {
+      ScaffoldMessenger.of(context).clearSnackBars();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('يرجى إدخال رابط لفحصه'),
+          backgroundColor: Theme.of(context).colorScheme.error,
+          behavior: SnackBarBehavior.floating,
         ),
       );
-    } else {
-      final scanState = ref.read(scanNotifierProvider);
-      final errorMsg = scanState.lastError ?? 'حدث خطأ أثناء الفحص';
+      return;
+    }
+
+    // التحقق من الاتصال بالإنترنت
+    final hasInternet = await _checkInternetConnectivity();
+    if (!hasInternet) {
+      if (!context.mounted) return;
       showDialog(
         context: context,
         builder: (ctx) => AlertDialog(
-          title: const Text('تعذر الفحص'),
+          icon: Icon(
+            Icons.wifi_off_rounded,
+            color: Theme.of(context).colorScheme.error,
+            size: 48,
+          ),
+          title: const Text('لا يوجد اتصال بالإنترنت'),
+          content: const Text(
+            'يرجى التحقق من اتصالك بالإنترنت والمحاولة مرة أخرى.\n\n'
+            'تأكد من:'
+            '\n• تفعيل الواي فاي أو البيانات'
+            '\n• استقرار الشبكة'
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('حسناً'),
+            ),
+          ],
+        ),
+      );
+      return;
+    }
+
+    // التحقق من سرعة الإنترنت
+    final isSpeedGood = await _checkInternetSpeed();
+    if (!isSpeedGood) {
+      if (!context.mounted) return;
+      final proceed = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          icon: Icon(
+            Icons.speed,
+            color: Colors.orange,
+            size: 48,
+          ),
+          title: const Text('اتصال الإنترنت بطيء'),
+          content: const Text(
+            'اتصال الإنترنت الحالي بطيء وقد يستغرق الفحص وقتاً أطول من المعتاد.\n\n'
+            'هل تريد المتابعة على أي حال؟'
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('إلغاء'),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.orange,
+                foregroundColor: Colors.white,
+              ),
+              child: const Text('متابعة على أي حال'),
+            ),
+          ],
+        ),
+      );
+      
+      if (!context.mounted || proceed != true) return;
+      
+      // عرض مؤشر مع رسالة توضيحية
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Row(
+            children: [
+              Icon(Icons.warning_amber, color: Colors.white, size: 20),
+              SizedBox(width: 8),
+              Expanded(child: Text('جاري الفحص... قد يستغرق وقتاً أطول بسبب بطء الاتصال')),
+            ],
+          ),
+          backgroundColor: Colors.orange,
+          behavior: SnackBarBehavior.floating,
+          duration: const Duration(seconds: 3),
+        ),
+      );
+    }
+
+    // محاولة الفحص مع timeout
+    try {
+      final result = await ref
+          .read(scanNotifierProvider.notifier)
+          .scanLink(_linkController.text.trim())
+          .timeout(
+            const Duration(seconds: 30),
+            onTimeout: () {
+              throw TimeoutException('استغرق الفحص وقتاً طويلاً');
+            },
+          );
+
+      if (!context.mounted) return;
+
+      if (result != null) {
+        _linkController.clear();
+        _linkFocusNode.unfocus();
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => ResultScreen(scanResult: result),
+          ),
+        );
+      } else {
+        final scanState = ref.read(scanNotifierProvider);
+        final errorMsg = _getUserFriendlyErrorMessage(null, scanState.lastError);
+        
+        showDialog(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            title: const Text('فشل الفحص'),
+            content: Text(errorMsg),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text('موافق'),
+              ),
+            ],
+          ),
+        );
+      }
+    } on TimeoutException catch (_) {
+      if (!context.mounted) return;
+      showDialog(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          icon: Icon(
+            Icons.timer_off,
+            color: Colors.orange,
+            size: 48,
+          ),
+          title: const Text('انتهت مهلة الفحص'),
+          content: const Text(
+            'استغرق الفحص وقتاً طويلاً جداً. هذا قد يكون بسبب:\n'
+            '• ضعف شديد في الاتصال\n'
+            '• مشكلة في الخادم\n'
+            '• الرابط غير مستجيب\n\n'
+            'يرجى المحاولة مرة أخرى لاحقاً.'
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('حسناً'),
+            ),
+          ],
+        ),
+      );
+    } catch (e) {
+      if (!context.mounted) return;
+      
+      // استخدام الدالة الجديدة لمعالجة الخطأ
+      final errorMsg = _getUserFriendlyErrorMessage(e, null);
+      
+      showDialog(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('مشكلة في السيرفر'),
           content: Text(errorMsg),
           actions: [
             TextButton(
@@ -444,49 +536,7 @@ Future<bool> _checkInternetSpeed() async {
         ),
       );
     }
-  } on TimeoutException catch (_) {
-    if (!context.mounted) return;
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        icon: Icon(
-          Icons.timer_off,
-          color: Colors.orange,
-          size: 48,
-        ),
-        title: const Text('انتهت مهلة الفحص'),
-        content: const Text(
-          'استغرق الفحص وقتاً طويلاً جداً. هذا قد يكون بسبب:\n'
-          '• ضعف شديد في الاتصال\n'
-          '• مشكلة في الخادم\n'
-          '• الرابط غير مستجيب\n\n'
-          'يرجى المحاولة مرة أخرى لاحقاً.'
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('حسناً'),
-          ),
-        ],
-      ),
-    );
-  } catch (e) {
-    if (!context.mounted) return;
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('خطأ في الفحص'),
-        content: Text('حدث خطأ غير متوقع: $e'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('موافق'),
-          ),
-        ],
-      ),
-    );
   }
-}
 
   void shareApp() {
     ScaffoldMessenger.of(context).showSnackBar(

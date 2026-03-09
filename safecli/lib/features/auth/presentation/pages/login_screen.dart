@@ -41,29 +41,32 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   }
 
   Future<void> _login(BuildContext context) async {
-    // Prevent multiple requests if already loading
-    if (ref.read(authProvider).isLoading) return;
+  if (ref.read(authProvider).isLoading) return;
 
-    final notifier = ref.read(authProvider.notifier);
+  final notifier = ref.read(authProvider.notifier);
 
-    if (_formKey.currentState!.validate()) {
-      final success = await notifier.login(
-        _usernameController.text.trim(),
-        _passwordController.text,
+  if (_formKey.currentState!.validate()) {
+    final success = await notifier.login(
+      _usernameController.text.trim(),
+      _passwordController.text,
+    );
+
+    if (success) {
+      if (!context.mounted) return;
+      
+      // ✅ إذا كان المستخدم اختار "تذكرني"، التوكنات ستبقى محفوظة
+      // لا حاجة لعمل شيء إضافي لأن التوكنات تحفظ تلقائياً في AuthNotifier
+      
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(builder: (context) => const HomeScreen()),
+        (route) => false,
       );
-
-      if (success) {
-        if (!context.mounted) return;
-        Navigator.of(context).pushAndRemoveUntil(
-          MaterialPageRoute(builder: (context) => const HomeScreen()),
-          (route) => false,
-        );
-      } else if (notifier.error != null) {
-        if (!context.mounted) return;
-        _showErrorSnackBar(context, notifier.error!);
-      }
+    } else if (notifier.error != null) {
+      if (!context.mounted) return;
+      _showErrorSnackBar(context, notifier.error!);
     }
   }
+}
 
   @override
   Widget build(BuildContext context) {
@@ -328,16 +331,16 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Row(
-          children: [
-            Checkbox(
-              value: _rememberMe,
-              activeColor: Theme.of(context).colorScheme.primary,
-              onChanged: (value) => setState(() => _rememberMe = value ?? false),
-            ),
-            const Text('تذكرني'),
-          ],
-        ),
+        // Row(
+        //   children: [
+        //     Checkbox(
+        //       value: _rememberMe,
+        //       activeColor: Theme.of(context).colorScheme.primary,
+        //       onChanged: (value) => setState(() => _rememberMe = value ?? false),
+        //     ),
+        //     const Text('تذكرني'),
+        //   ],
+        // ),
         const SizedBox(height: 8),
         TextButton(
           onPressed: () {

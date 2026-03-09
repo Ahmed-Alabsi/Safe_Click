@@ -6,40 +6,40 @@ import 'package:safeclik/features/auth/data/models/user_model.dart';
 import 'package:safeclik/core/utils/local_storage_service.dart';
 import 'package:safeclik/core/di/di.dart';
 
-final profileProvider = AsyncNotifierProvider<ProfileNotifier, UserModel>(
-  () => ProfileNotifier(),
+final profileProvider = StateNotifierProvider<ProfileNotifier, AsyncValue<UserModel>>(
+  (ref) => ProfileNotifier(),
 );
 
-class ProfileNotifier extends AsyncNotifier<UserModel> {
+class ProfileNotifier extends StateNotifier<AsyncValue<UserModel>> {
   final LocalStorageService _storageService = sl<LocalStorageService>();
   final ImagePicker _imagePicker = ImagePicker();
 
-  @override
-  Future<UserModel> build() async {
-    return _loadUserData();
+  ProfileNotifier() : super(const AsyncValue.loading()) {
+    _loadUserData();
   }
 
-  Future<UserModel> _loadUserData() async {
+  Future<void> _loadUserData() async {
     try {
       final savedUser = await _storageService.getUser('current_user');
       if (savedUser != null) {
-        return savedUser;
+        state = AsyncValue.data(savedUser);
+      } else {
+        // Default mock user if not found/logged in yet
+        final defaultUser = UserModel(
+          id: 'user_123',
+          name: 'أحمد محمد',
+          email: 'ahmed@example.com',
+          createdAt: DateTime.now().subtract(const Duration(days: 30)),
+          scannedLinks: 150,
+          detectedThreats: 23,
+          accuracyRate: 98.5,
+          isEmailVerified: true,
+        );
+        state = AsyncValue.data(defaultUser);
       }
-    } catch (e) {
-      debugPrint('خطأ في تحميل بيانات المستخدم');
+    } catch (e, stack) {
+      state = AsyncValue.error(e, stack);
     }
-    
-    // Default mock user if not found/logged in yet
-    return UserModel(
-      id: 'user_123',
-      name: 'أحمد محمد',
-      email: 'ahmed@example.com',
-      createdAt: DateTime.now().subtract(const Duration(days: 30)),
-      scannedLinks: 150,
-      detectedThreats: 23,
-      accuracyRate: 98.5,
-      isEmailVerified: true,
-    );
   }
 
   Future<File?> pickImageFromGallery() async {
@@ -79,76 +79,108 @@ class ProfileNotifier extends AsyncNotifier<UserModel> {
       return null;
     }
   }
+  
 
   Future<bool> updateProfileImage(File image) async {
-    if (state.value == null) return false;
+    final currentState = state;
+    if (currentState is! AsyncData<UserModel>) return false;
+    
     try {
+      // Set loading state
       state = const AsyncValue.loading();
-      final currentUser = state.value!;
+      
+      final currentUser = currentState.value;
       
       final imagePath = await _storageService.saveProfileImage(image, currentUser.id);
       final updatedUser = currentUser.copyWith(profileImage: imagePath);
       
       await _storageService.saveUser(updatedUser);
+      
+      // Update with new data
       state = AsyncValue.data(updatedUser);
       return true;
-    } catch (e) {
+    } catch (e, stack) {
+      // Revert to previous state on error
+      state = AsyncValue.data(currentState.value);
       debugPrint('خطأ في تحديث الصورة: $e');
       return false;
     }
   }
 
   Future<bool> updateName(String newName) async {
-    if (state.value == null) return false;
+    final currentState = state;
+    if (currentState is! AsyncData<UserModel>) return false;
+    
     try {
       if (newName.isEmpty) {
         throw Exception('الاسم لا يمكن أن يكون فارغاً');
       }
 
+      // Set loading state
       state = const AsyncValue.loading();
-      final updatedUser = state.value!.copyWith(name: newName);
+      
+      final updatedUser = currentState.value.copyWith(name: newName);
       
       await _storageService.saveUser(updatedUser);
+      
+      // Update with new data
       state = AsyncValue.data(updatedUser);
       return true;
-    } catch (e) {
+    } catch (e, stack) {
+      // Revert to previous state on error
+      state = AsyncValue.data(currentState.value);
       debugPrint('خطأ في تحديث الاسم: $e');
-      // On error, revert to previous state by just reloading or putting old value
-      state = AsyncValue.data(state.value!);
       return false;
     }
   }
 
   Future<bool> updateEmail(String newEmail) async {
-    if (state.value == null) return false;
+    final currentState = state;
+    if (currentState is! AsyncData<UserModel>) return false;
+    
     try {
       if (newEmail.isEmpty || !newEmail.contains('@')) {
         throw Exception('البريد الإلكتروني غير صحيح');
       }
 
+      // Set loading state
       state = const AsyncValue.loading();
-      final updatedUser = state.value!.copyWith(email: newEmail, isEmailVerified: false);
+      
+      final updatedUser = currentState.value.copyWith(
+        email: newEmail,
+        isEmailVerified: false,
+      );
       
       await _storageService.saveUser(updatedUser);
+      
+      // Update with new data
       state = AsyncValue.data(updatedUser);
       return true;
-    } catch (e) {
+    } catch (e, stack) {
+      // Revert to previous state on error
+      state = AsyncValue.data(currentState.value);
       debugPrint('خطأ في تحديث البريد الإلكتروني: $e');
-      state = AsyncValue.data(state.value!);
       return false;
     }
   }
 
   Future<void> incrementScannedLinks() async {
-    if (state.value == null) return;
-    final updatedUser = state.value!.copyWith(scannedLinks: state.value!.scannedLinks + 1);
+    final currentState = state;
+    if (currentState is! AsyncData<UserModel>) return;
+    
+    final updatedUser = currentState.value.copyWith(
+      scannedLinks: currentState.value.scannedLinks + 1
+    );
+    
     await _storageService.saveUser(updatedUser);
     state = AsyncValue.data(updatedUser);
   }
 
   Future<void> incrementDetectedThreats() async {
-    if (state.value == null) return;
-    final currentUser = state.value!;
+    final currentState = state;
+    if (currentState is! AsyncData<UserModel>) return;
+    
+    final currentUser = currentState.value;
     
     final newThreats = currentUser.detectedThreats + 1;
     final newAccuracy = _calculateAccuracy(currentUser.scannedLinks + 1, newThreats);
@@ -165,5 +197,10 @@ class ProfileNotifier extends AsyncNotifier<UserModel> {
   double _calculateAccuracy(int scanned, int threats) {
     if (scanned == 0) return 100.0;
     return ((scanned - threats) / scanned * 100).clamp(0, 100);
+  }
+
+  // دالة لإعادة تحميل البيانات
+  Future<void> refreshUserData() async {
+    await _loadUserData();
   }
 }

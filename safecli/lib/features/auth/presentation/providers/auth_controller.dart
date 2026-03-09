@@ -31,32 +31,61 @@ class AuthNotifier extends StateNotifier<AuthState> {
 
   // ── Helpers ──────────────────────────────────────────────────────────────
 
+  // حفظ التوكنات في التخزين الآمن
+  Future<void> _saveTokens(String accessToken, String refreshToken) async {
+  // استخدام ApiClient لحفظ التوكنات
+  await sl<ApiClient>().saveTokens(accessToken, refreshToken);
+  debugPrint('✅ تم حفظ التوكنات بنجاح');
+}
+
   Future<void> _loadSavedUser() async {
-    try {
-      final token = await _secureStorage.read(key: _kAccessToken);
-      if (token != null) {
-        final response = await _authApi.getProfile();
-        if (response['success'] == true && response.containsKey('user')) {
-          state = state.copyWith(
-            isInitializing: false,
-            user: UserModel.fromJson(response['user']),
-          );
-          return;
-        }
-        await _clearTokens();
-      }
-    } catch (e) {
-      debugPrint('AuthNotifier._loadSavedUser error: $e');
+  try {
+    final token = await _secureStorage.read(key: _kAccessToken);
+    
+    if (token != null) {
+      debugPrint('📱 تم العثور على توكن مخزن');
+      
+      // ✅ فقط نحدث state أن هناك توكن موجود
+      state = state.copyWith(
+        isInitializing: false,
+        hasToken: true,  // 👈 هذا هو المفتاح
+      );
+      
+      // محاولة جلب بيانات المستخدم في الخلفية (اختياري)
+      _fetchUserProfileInBackground();
+      
+      return;
     }
-    state = state.copyWith(isInitializing: false);
+  } catch (e) {
+    debugPrint('❌ AuthNotifier._loadSavedUser error: $e');
   }
+  
+  state = state.copyWith(isInitializing: false, hasToken: false);
+}
+
+// جلب بيانات المستخدم في الخلفية (اختياري)
+Future<void> _fetchUserProfileInBackground() async {
+  try {
+    final response = await _authApi.getProfile();
+    if (response['success'] == true && response.containsKey('user')) {
+      // تحديث state ببيانات المستخدم إذا وصلت
+      state = state.copyWith(
+        user: UserModel.fromJson(response['user']),
+        hasToken: true,
+      );
+    }
+  } catch (e) {
+    // إذا فشل جلب البيانات، نبقى على hasToken = true
+    debugPrint('⚠️ فشل جلب بيانات المستخدم في الخلفية: $e');
+  }
+}
+
 
   Future<void> _clearTokens() async {
-    await _secureStorage.delete(key: _kAccessToken);
-    await _secureStorage.delete(key: _kRefreshToken);
-    sl<ApiClient>().cacheToken(null);
-    state = state.copyWith(clearUser: true, clearError: true, isInitializing: false);
-  }
+  await sl<ApiClient>().clearTokens();
+  state = state.copyWith(clearUser: true, clearError: true, isInitializing: false);
+  debugPrint('🗑️ تم مسح التوكنات');
+}
 
   // ── Public API ────────────────────────────────────────────────────────────
 
@@ -67,9 +96,26 @@ class AuthNotifier extends StateNotifier<AuthState> {
 
     try {
       final response = await _authApi.login(username: username, password: password);
+      debugPrint('📥 استجابة تسجيل الدخول: $response');
+      
       if (response['success'] == true) {
-        final user = UserModel.fromJson(response['user']);
+        // استخراج التوكنات من الاستجابة
+        final data = response['data'] as Map<String, dynamic>?;
+        final tokens = data?['tokens'] as Map<String, dynamic>?;
+        
+        if (tokens != null) {
+          final accessToken = tokens['access'];
+          final refreshToken = tokens['refresh'];
+          
+          if (accessToken != null && refreshToken != null) {
+            // حفظ التوكنات
+            await _saveTokens(accessToken, refreshToken);
+          }
+        }
+        
+        final user = UserModel.fromJson(response['user'] ?? data?['user']);
         state = AuthState(isInitializing: false, isLoading: false, user: user);
+        debugPrint('✅ تسجيل دخول ناجح للمستخدم: ${user.email}');
         return true;
       } else {
         state = AuthState(
@@ -80,7 +126,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
         return false;
       }
     } catch (e) {
-      debugPrint('Login exception: $e');
+      debugPrint('❌ Login exception: $e');
       state = AuthState(isInitializing: false, isLoading: false, error: 'تعذر الاتصال بالخادم');
     }
     return false;
@@ -135,15 +181,30 @@ class AuthNotifier extends StateNotifier<AuthState> {
     
     try {
       final response = await _authApi.verifyOtp(email: email, otp: otp);
+      debugPrint('📥 استجابة التحقق: $response');
+      
       if (response['success'] == true) {
         final data = response['data'] as Map<String, dynamic>?;
         
         // If tokens and user are in response (Direct Login)
-        if (data != null && data['tokens'] != null && data['user'] != null) {
-          final user = UserModel.fromJson(data['user']);
-          state = AuthState(isInitializing: false, isLoading: false, user: user);
-        } else {
-          state = state.copyWith(isLoading: false);
+        if (data != null) {
+          // حفظ التوكنات إذا وجدت
+          final tokens = data['tokens'] as Map<String, dynamic>?;
+          if (tokens != null) {
+            final accessToken = tokens['access'];
+            final refreshToken = tokens['refresh'];
+            if (accessToken != null && refreshToken != null) {
+              await _saveTokens(accessToken, refreshToken);
+            }
+          }
+          
+          // حفظ بيانات المستخدم
+          if (data['user'] != null) {
+            final user = UserModel.fromJson(data['user']);
+            state = AuthState(isInitializing: false, isLoading: false, user: user);
+          } else {
+            state = state.copyWith(isLoading: false);
+          }
         }
         return true;
       }
@@ -188,7 +249,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
     try {
       await _authApi.logout().catchError((_) => <String, dynamic>{});
     } finally {
-      await _clearTokens();
+      await _clearTokens(); // هذه الدالة تمسح التوكنات من التخزين
     }
   }
 

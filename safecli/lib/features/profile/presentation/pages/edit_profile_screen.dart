@@ -16,6 +16,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
   late TextEditingController _nameController;
   File? _selectedImage;
   bool _isLoading = false;
+  String? _successMessage;
 
   @override
   void initState() {
@@ -37,36 +38,86 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
     if (pickedFile != null) {
       setState(() {
         _selectedImage = File(pickedFile.path);
+        _successMessage = null;
       });
+      
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('تم اختيار الصورة بنجاح'),
+          backgroundColor: Colors.green,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
     }
   }
 
   Future<void> _saveProfile() async {
     if (!_formKey.currentState!.validate()) return;
 
-    setState(() => _isLoading = true);
+    setState(() {
+      _isLoading = true;
+      _successMessage = null;
+    });
 
     final authNotifier = ref.read(authProvider.notifier);
     final currentUser = ref.read(authProvider).user;
-    bool success = true;
+    bool nameUpdated = false;
+    bool imageUpdated = false;
 
-    // تحديث الاسم
-    if (_nameController.text != currentUser?.name) {
-      success = await authNotifier.updateProfile(name: _nameController.text);
+    // تحديث الاسم - استخدام authProvider مباشرة
+    if (_nameController.text.trim() != currentUser?.name) {
+      nameUpdated = await authNotifier.updateProfile(name: _nameController.text.trim());
+      if (nameUpdated) {
+        debugPrint('✅ تم تحديث الاسم بنجاح في authProvider');
+      }
     }
 
-    // تحديث الصورة
-    if (success && _selectedImage != null) {
-      success = await authNotifier.updateProfileImage(_selectedImage!.path);
+    // تحديث الصورة - استخدام authProvider مباشرة
+    if (_selectedImage != null) {
+      imageUpdated = await authNotifier.updateProfileImage(_selectedImage!.path);
+      if (imageUpdated) {
+        debugPrint('✅ تم تحديث الصورة بنجاح في authProvider');
+      }
     }
 
     setState(() => _isLoading = false);
 
-    if (success && mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('تم تحديث الملف الشخصي')),
-      );
-      Navigator.pop(context);
+    if (mounted) {
+      if (nameUpdated || imageUpdated) {
+        String message = '';
+        if (nameUpdated && imageUpdated) {
+          message = 'تم تحديث الاسم والصورة بنجاح';
+        } else if (nameUpdated) {
+          message = 'تم تحديث الاسم بنجاح';
+        } else if (imageUpdated) {
+          message = 'تم تحديث الصورة بنجاح';
+        }
+
+        // تحديث profileProvider أيضاً إذا كنت تستخدمه
+        // ref.read(profileProvider.notifier).refreshUserData();
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(message),
+            backgroundColor: Colors.green,
+            behavior: SnackBarBehavior.floating,
+            duration: const Duration(seconds: 2),
+          ),
+        );
+
+        await Future.delayed(const Duration(milliseconds: 500));
+        if (mounted) {
+          Navigator.pop(context, true);
+        }
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('لا توجد تغييرات للحفظ'),
+            backgroundColor: Colors.orange,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
     }
   }
 
@@ -78,6 +129,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('تعديل الملف الشخصي'),
+        elevation: 0,
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
@@ -121,6 +173,15 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                         ],
                       ),
                     ),
+                    const SizedBox(height: 8),
+                    TextButton.icon(
+                      onPressed: _pickImage,
+                      icon: const Icon(Icons.photo_library, size: 18),
+                      label: const Text('تغيير الصورة'),
+                      style: TextButton.styleFrom(
+                        foregroundColor: Colors.blue,
+                      ),
+                    ),
                     const SizedBox(height: 30),
                     
                     // حقل الاسم
@@ -132,6 +193,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                           borderRadius: BorderRadius.circular(10),
                         ),
                         prefixIcon: const Icon(Icons.person),
+                        hintText: 'أدخل اسمك الكامل',
                       ),
                       validator: (value) {
                         if (value == null || value.isEmpty) {
@@ -159,17 +221,20 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                     // زر الحفظ
                     SizedBox(
                       width: double.infinity,
+                      height: 50,
                       child: ElevatedButton(
                         onPressed: _saveProfile,
                         style: ElevatedButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(vertical: 15),
+                          backgroundColor: Colors.blue,
+                          foregroundColor: Colors.white,
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(10),
                           ),
+                          elevation: 3,
                         ),
                         child: const Text(
                           'حفظ التغييرات',
-                          style: TextStyle(fontSize: 16),
+                          style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                         ),
                       ),
                     ),
