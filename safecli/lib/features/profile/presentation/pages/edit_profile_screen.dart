@@ -96,14 +96,14 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                             radius: 60,
                             backgroundImage: _selectedImage != null
                                 ? FileImage(_selectedImage!)
-                                : (user?.profileImage != null
-                                    ? NetworkImage(user!.fullProfileImageUrl!)
+                                : (user != null && user.profileImage != null
+                                    ? NetworkImage(user.fullProfileImageUrl!)
                                     : const AssetImage('assets/images/default_avatar.png')
                                         as ImageProvider),
-                            child: _selectedImage == null && user?.profileImage == null
+                            child: _selectedImage == null && (user == null || user.profileImage == null)
                                 ? Text(
-                                    user?.name.isNotEmpty == true
-                                        ? user!.name[0].toUpperCase()
+                                    (user?.name != null && user!.name.isNotEmpty)
+                                        ? user.name[0].toUpperCase()
                                         : '?',
                                     style: const TextStyle(fontSize: 40),
                                   )

@@ -304,15 +304,15 @@ class SettingsScreen extends ConsumerWidget {
   }
 
   // 📤 مشاركة التطبيق
-  void _shareApp(BuildContext context) {
-    // يمكن استخدام share_plus لمشاركة التطبيق
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('سيتم إضافة ميزة المشاركة قريباً'),
-        behavior: SnackBarBehavior.floating,
-      ),
-    );
-  }
+  // void _shareApp(BuildContext context) {
+  //   // يمكن استخدام share_plus لمشاركة التطبيق
+  //   ScaffoldMessenger.of(context).showSnackBar(
+  //     const SnackBar(
+  //       content: Text('سيتم إضافة ميزة المشاركة قريباً'),
+  //       behavior: SnackBarBehavior.floating,
+  //     ),
+  //   );
+  // }
 
   // 🔒 واجهة سياسة الخصوصية
   void _showPrivacyPolicy(BuildContext context) {
@@ -719,58 +719,58 @@ class SettingsScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildScanLevelTile(BuildContext context, SettingsModel settings, SettingsNotifier notifier) {
-    const levelNames = {'basic': 'أساسي', 'standard': 'قياسي', 'deep': 'عميق'};
-    return ListTile(
-      leading: Container(
-        padding: const EdgeInsets.all(8),
-        decoration: BoxDecoration(
-          color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.1),
-          shape: BoxShape.circle,
-        ),
-        child: Icon(Icons.speed, color: Theme.of(context).colorScheme.primary),
-      ),
-      title: const Text('مستوى الفحص'),
-      subtitle: Text(levelNames[settings.scanLevel] ?? 'قياسي'),
-      trailing: DropdownButton<String>(
-        value: settings.scanLevel,
-        underline: const SizedBox(),
-        items: const [
-          DropdownMenuItem(value: 'basic', child: Text('أساسي')),
-          DropdownMenuItem(value: 'standard', child: Text('قياسي')),
-          DropdownMenuItem(value: 'deep', child: Text('عميق')),
-        ],
-        onChanged: (value) { if (value != null) notifier.setScanLevel(value); },
-      ),
-    );
-  }
+  // Widget _buildScanLevelTile(BuildContext context, SettingsModel settings, SettingsNotifier notifier) {
+  //   const levelNames = {'basic': 'أساسي', 'standard': 'قياسي', 'deep': 'عميق'};
+  //   return ListTile(
+  //     leading: Container(
+  //       padding: const EdgeInsets.all(8),
+  //       decoration: BoxDecoration(
+  //         color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.1),
+  //         shape: BoxShape.circle,
+  //       ),
+  //       child: Icon(Icons.speed, color: Theme.of(context).colorScheme.primary),
+  //     ),
+  //     title: const Text('مستوى الفحص'),
+  //     subtitle: Text(levelNames[settings.scanLevel] ?? 'قياسي'),
+  //     trailing: DropdownButton<String>(
+  //       value: settings.scanLevel,
+  //       underline: const SizedBox(),
+  //       items: const [
+  //         DropdownMenuItem(value: 'basic', child: Text('أساسي')),
+  //         DropdownMenuItem(value: 'standard', child: Text('قياسي')),
+  //         DropdownMenuItem(value: 'deep', child: Text('عميق')),
+  //       ],
+  //       onChanged: (value) { if (value != null) notifier.setScanLevel(value); },
+  //     ),
+  //   );
+  // }
 
-  Widget _buildSliderTile({
-    required BuildContext context,
-    required String title,
-    required double value,
-    required double min,
-    required double max,
-    required int divisions,
-    required Function(double) onChanged,
-  }) {
-    return Column(
-      children: [
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [Text(title), Text('${value.toInt()} ثانية')],
-          ),
-        ),
-        Slider(
-          value: value, min: min, max: max, divisions: divisions,
-          activeColor: Theme.of(context).colorScheme.primary,
-          onChanged: onChanged,
-        ),
-      ],
-    );
-  }
+  // Widget _buildSliderTile({
+  //   required BuildContext context,
+  //   required String title,
+  //   required double value,
+  //   required double min,
+  //   required double max,
+  //   required int divisions,
+  //   required Function(double) onChanged,
+  // }) {
+  //   return Column(
+  //     children: [
+  //       Padding(
+  //         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+  //         child: Row(
+  //           mainAxisAlignment: MainAxisAlignment.spaceBetween,
+  //           children: [Text(title), Text('${value.toInt()} ثانية')],
+  //         ),
+  //       ),
+  //       Slider(
+  //         value: value, min: min, max: max, divisions: divisions,
+  //         activeColor: Theme.of(context).colorScheme.primary,
+  //         onChanged: onChanged,
+  //       ),
+  //     ],
+  //   );
+  // }
 
   Widget _buildInfoTile(BuildContext context, {required String title, required String value, required IconData icon}) {
     return ListTile(
@@ -800,31 +800,31 @@ class SettingsScreen extends ConsumerWidget {
     );
   }
 
-  void _showResetDialog(BuildContext context, SettingsNotifier notifier) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('إعادة ضبط الإعدادات'),
-        content: const Text('هل أنت متأكد من إعادة ضبط جميع الإعدادات إلى القيم الافتراضية؟'),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('إلغاء')),
-          ElevatedButton(
-            onPressed: () {
-              notifier.resetToDefaults();
-              Navigator.pop(context);
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: const Text('تم إعادة ضبط الإعدادات'),
-                  backgroundColor: Theme.of(context).colorScheme.secondary,
-                  behavior: SnackBarBehavior.floating,
-                ),
-              );
-            },
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Theme.of(context).colorScheme.onError),
-            child: const Text('إعادة الضبط'),
-          ),
-        ],
-      ),
-    );
-  }
+  // void _showResetDialog(BuildContext context, SettingsNotifier notifier) {
+  //   showDialog(
+  //     context: context,
+  //     builder: (context) => AlertDialog(
+  //       title: const Text('إعادة ضبط الإعدادات'),
+  //       content: const Text('هل أنت متأكد من إعادة ضبط جميع الإعدادات إلى القيم الافتراضية؟'),
+  //       actions: [
+  //         TextButton(onPressed: () => Navigator.pop(context), child: const Text('إلغاء')),
+  //         ElevatedButton(
+  //           onPressed: () {
+  //             notifier.resetToDefaults();
+  //             Navigator.pop(context);
+  //             ScaffoldMessenger.of(context).showSnackBar(
+  //               SnackBar(
+  //                 content: const Text('تم إعادة ضبط الإعدادات'),
+  //                 backgroundColor: Theme.of(context).colorScheme.secondary,
+  //                 behavior: SnackBarBehavior.floating,
+  //               ),
+  //             );
+  //           },
+  //           style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Theme.of(context).colorScheme.onError),
+  //           child: const Text('إعادة الضبط'),
+  //         ),
+  //       ],
+  //     ),
+  //   );
+  // }
 }

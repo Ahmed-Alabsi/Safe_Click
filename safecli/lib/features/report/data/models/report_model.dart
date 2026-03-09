@@ -10,6 +10,7 @@ class ReportModel {
   final int severity;
   final String? trackingNumber;
   final String? status;
+  final DateTime? deletedAt;
 
   ReportModel({
     required this.id,
@@ -22,6 +23,7 @@ class ReportModel {
     required this.severity,
     this.trackingNumber,
     this.status,
+    this.deletedAt,
   });
 
   factory ReportModel.fromJson(Map<String, dynamic> json) {
@@ -36,6 +38,7 @@ class ReportModel {
       severity: json['severity'] ?? 3,
       trackingNumber: json['tracking_number']?.toString(),
       status: json['status']?.toString(),
+      deletedAt: json['deleted_at'] != null ? DateTime.parse(json['deleted_at']) : null,
     );
   }
 

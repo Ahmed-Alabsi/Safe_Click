@@ -4,6 +4,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:safeclik/core/network/api_client.dart';
 import 'package:safeclik/features/auth/presentation/providers/auth_controller.dart';
 import 'package:safeclik/features/auth/presentation/pages/register_screen.dart';
+import 'package:safeclik/features/auth/presentation/pages/forgot_password_screen.dart';
+import 'package:safeclik/features/main/presentation/pages/home_screen.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
@@ -14,14 +16,14 @@ class LoginScreen extends ConsumerStatefulWidget {
 
 class _LoginScreenState extends ConsumerState<LoginScreen> {
   final _formKey = GlobalKey<FormState>();
-  final _emailController = TextEditingController();
+  final _usernameController = TextEditingController();
   final _passwordController = TextEditingController();
   bool _rememberMe = false;
   bool _obscurePassword = true;
 
   @override
   void dispose() {
-    _emailController.dispose();
+    _usernameController.dispose();
     _passwordController.dispose();
     super.dispose();
   }
@@ -46,13 +48,18 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
     if (_formKey.currentState!.validate()) {
       final success = await notifier.login(
-        _emailController.text.trim(),
+        _usernameController.text.trim(),
         _passwordController.text,
       );
 
-      if (!context.mounted) return;
-      
-      if (!success && notifier.error != null) {
+      if (success) {
+        if (!context.mounted) return;
+        Navigator.of(context).pushAndRemoveUntil(
+          MaterialPageRoute(builder: (context) => const HomeScreen()),
+          (route) => false,
+        );
+      } else if (notifier.error != null) {
+        if (!context.mounted) return;
         _showErrorSnackBar(context, notifier.error!);
       }
     }
@@ -218,7 +225,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 ),
               ),
               const SizedBox(height: 20),
-              _buildEmailField(),
+              _buildUsernameField(),
               const SizedBox(height: 15),
               _buildPasswordField(),
               const SizedBox(height: 10),
@@ -232,15 +239,14 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     );
   }
 
-  Widget _buildEmailField() {
+  Widget _buildUsernameField() {
     return TextFormField(
-      controller: _emailController,
-      keyboardType: TextInputType.emailAddress,
-      textDirection: TextDirection.ltr,
+      controller: _usernameController,
+      keyboardType: TextInputType.text,
       decoration: InputDecoration(
-        labelText: 'البريد الإلكتروني',
-        hintText: 'example@email.com',
-        prefixIcon: Icon(Icons.email, color: Theme.of(context).colorScheme.primary),
+        labelText: 'الاسم الكامل',
+        hintText: 'أدخل اسم المستخدم',
+        prefixIcon: Icon(Icons.person, color: Theme.of(context).colorScheme.primary),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
           borderSide: BorderSide(color: Theme.of(context).colorScheme.outlineVariant),
@@ -260,10 +266,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       ),
       validator: (value) {
         if (value == null || value.isEmpty) {
-          return 'يرجى إدخال البريد الإلكتروني';
+          return 'يرجى إدخال اسم المستخدم';
         }
-        if (!value.contains('@') || !value.contains('.')) {
-          return 'البريد الإلكتروني غير صحيح';
+        if (value.length < 3) {
+          return 'الاسم يجب أن يكون 3 أحرف على الأقل';
         }
         return null;
       },
@@ -334,7 +340,12 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         ),
         const SizedBox(height: 8),
         TextButton(
-          onPressed: _showForgotPasswordDialog,
+          onPressed: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (context) => const ForgotPasswordScreen()),
+            );
+          },
           child: Text(
             'نسيت كلمة المرور؟',
             style: TextStyle(color: Theme.of(context).colorScheme.primary),
@@ -404,63 +415,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
           ),
         ),
       ],
-    );
-  }
-
-  void _showForgotPasswordDialog() {
-    final emailController = TextEditingController();
-
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: Theme.of(context).colorScheme.surface,
-        title: const Text('استعادة كلمة المرور', style: TextStyle(fontWeight: FontWeight.bold)),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text('أدخل بريدك الإلكتروني لإرسال رابط استعادة كلمة المرور', style: Theme.of(context).textTheme.bodyMedium),
-            const SizedBox(height: 15),
-            TextField(
-              controller: emailController,
-              decoration: InputDecoration(
-                hintText: 'البريد الإلكتروني',
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                prefixIcon: const Icon(Icons.email),
-              ),
-              keyboardType: TextInputType.emailAddress,
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text('إلغاء', style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant)),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              final success = await ref.read(authProvider.notifier).resetPassword(emailController.text);
-              final error = ref.read(authProvider.notifier).error;
-              
-              if (!context.mounted) return;
-              Navigator.pop(context);
-                  
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text(success ? 'تم إرسال رابط إعادة التعيين إلى بريدك الإلكتروني' : (error ?? 'فشل الإرسال')),
-                  backgroundColor: success ? Theme.of(context).colorScheme.secondary : Theme.of(context).colorScheme.error,
-                ),
-              );
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Theme.of(context).colorScheme.primary,
-              foregroundColor: Theme.of(context).colorScheme.onPrimary,
-            ),
-            child: const Text('إرسال'),
-          ),
-        ],
-      ),
     );
   }
 }

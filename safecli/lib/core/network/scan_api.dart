@@ -38,7 +38,7 @@ class ScanApi {
 
   Future<Map<String, dynamic>> deleteScan(String scanId) async {
     try {
-      final response = await _client.dio.delete('/scans/history/$scanId/delete/');
+      final response = await _client.dio.post('/scans/history/$scanId/delete/');
       return response.data;
     } catch (e) {
       return _client.handleDioError(e);
@@ -47,7 +47,7 @@ class ScanApi {
 
   Future<Map<String, dynamic>> clearHistory() async {
     try {
-      final response = await _client.dio.delete('/scans/history/clear/');
+      final response = await _client.dio.post('/scans/history/clear-all/');
       return response.data;
     } catch (e) {
       return _client.handleDioError(e);

@@ -385,7 +385,7 @@ Future<bool> _checkInternetSpeed() async {
       ),
     );
     
-    if (proceed != true) return;
+    if (!context.mounted || proceed != true) return;
     
     // عرض مؤشر مع رسالة توضيحية
     ScaffoldMessenger.of(context).showSnackBar(

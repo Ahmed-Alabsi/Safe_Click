@@ -3,6 +3,7 @@
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:safeclik/features/auth/presentation/providers/auth_controller.dart';
 
 import 'package:safeclik/features/scan/data/models/scan_result.dart';
 import 'package:safeclik/features/scan/domain/entities/scan_entity.dart';
@@ -17,14 +18,29 @@ import 'package:safeclik/features/scan/data/repositories/scan_repository_impl.da
 import 'scan_state.dart';
 
 final scanNotifierProvider = StateNotifierProvider<ScanNotifier, ScanState>(
-  (ref) => ScanNotifier(
-    scanLinkUseCase: sl<ScanLinkUseCase>(),
-    getHistoryUseCase: sl<GetScanHistoryUseCase>(),
-    deleteUseCase: sl<DeleteScanUseCase>(),
-    clearUseCase: sl<ClearHistoryUseCase>(),
-    saveHistoryUseCase: sl<SaveHistoryUseCase>(),
-    repo: sl<ScanRepositoryImpl>(),
-  ),
+  (ref) {
+    final notifier = ScanNotifier(
+      scanLinkUseCase: sl<ScanLinkUseCase>(),
+      getHistoryUseCase: sl<GetScanHistoryUseCase>(),
+      deleteUseCase: sl<DeleteScanUseCase>(),
+      clearUseCase: sl<ClearHistoryUseCase>(),
+      saveHistoryUseCase: sl<SaveHistoryUseCase>(),
+      repo: sl<ScanRepositoryImpl>(),
+    );
+
+    // Watch for auth state changes to sync/reset
+    ref.listen(authProvider.select((a) => a.user?.id), (previous, next) {
+      if (next != null) {
+        debugPrint('👤 [Session] User logged in: $next. Syncing scan history...');
+        notifier.refreshHistory();
+      } else if (previous != null && next == null) {
+        debugPrint('👤 [Session] User logged out. Resetting scan state...');
+        notifier.reset();
+      }
+    });
+
+    return notifier;
+  },
 );
 
 class ScanNotifier extends StateNotifier<ScanState> {
