@@ -3,17 +3,18 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:app_links/app_links.dart';
 import 'dart:async';
+import 'package:firebase_core/firebase_core.dart';
+import 'firebase_options.dart';
+import 'package:onesignal_flutter/onesignal_flutter.dart';
 
 import 'package:safeclik/core/di/di.dart';
 import 'package:safeclik/core/utils/notification_service.dart';
 import 'package:safeclik/core/theme/app_theme.dart';
-
 import 'package:safeclik/core/network/api_client.dart';
 import 'package:safeclik/features/auth/presentation/providers/auth_controller.dart';
 import 'package:safeclik/features/settings/presentation/providers/settings_controller.dart';
 import 'package:safeclik/features/scan/presentation/controllers/scan_notifier.dart';
 import 'package:safeclik/features/scan/data/models/scan_result.dart';
-
 import 'package:safeclik/features/main/presentation/pages/splash_screen.dart';
 import 'package:safeclik/features/auth/presentation/pages/login_screen.dart';
 import 'package:safeclik/features/auth/presentation/pages/register_screen.dart';
@@ -27,24 +28,33 @@ import 'package:safeclik/features/report/presentation/pages/report_screen.dart';
 import 'package:safeclik/features/settings/presentation/pages/settings_screen.dart';
 import 'package:safeclik/features/auth/presentation/pages/forgot_password_screen.dart';
 
-
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Phase 1 Fix #1: Load environment variables FIRST before any other code.
+  // 1. تحميل المتغيرات البيئية
   await dotenv.load(fileName: '.env');
 
-  // Initialize dependency injection AFTER dotenv so ApiService reads env vars.
+  // 2. تهيئة Firebase
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
+
+  // 3. تهيئة OneSignal
+  OneSignal.Debug.setLogLevel(OSLogLevel.verbose);
+  OneSignal.initialize('0f1794d8-2a8a-4bea-bc5e-e25784cebd69');
+  await OneSignal.Notifications.requestPermission(true);
+
+  // 4. باقي التهيئات
   await initDI();
-
-  // Phase 6: Initialize Smart API Discovery
   await ApiClient.initialize();
-
-  // Initialize Notifications
   await sl<NotificationService>().initialize();
 
   runApp(const ProviderScope(child: MyApp()));
 }
+
+// باقي الكود (MyApp, _MyAppState) يبقى كما هو...
+
+// باقي الكود كما هو...
 
 class MyApp extends ConsumerStatefulWidget {
   const MyApp({super.key});

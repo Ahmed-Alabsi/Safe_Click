@@ -16,6 +16,10 @@ dependencies:
   get_it: ^7.7.0
   flutter_riverpod: ^2.5.1
 
+  firebase_core: ^2.27.0 # أحدث إصدار
+    
+  # باقي الحزم الأخرى
+  onesignal_flutter: ^5.2.0
 
   flutter_dotenv: ^5.1.0
     # للتخزين المحلي - إصدارات محدثة
