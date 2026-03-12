@@ -1,4 +1,5 @@
-﻿import 'dart:async';
+import 'dart:async';
+import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
@@ -13,6 +14,7 @@ export 'auth_state.dart';
 // ── Secure token storage keys ─────────────────────────────────────────────
 const _kAccessToken = 'access_token';
 const _kRefreshToken = 'refresh_token';
+const _kCachedUser = 'cached_user_data';
 
 final _secureStorage = const FlutterSecureStorage(
   aOptions: AndroidOptions(encryptedSharedPreferences: true),
@@ -39,40 +41,67 @@ class AuthNotifier extends StateNotifier<AuthState> {
 }
 
   Future<void> _loadSavedUser() async {
-  try {
-    final token = await _secureStorage.read(key: _kAccessToken);
-    
-    if (token != null) {
-      debugPrint('📱 تم العثور على توكن مخزن');
+    try {
+      final token = await _secureStorage.read(key: _kAccessToken);
+      final cachedUserData = await _secureStorage.read(key: _kCachedUser);
       
-      // ✅ فقط نحدث state أن هناك توكن موجود
-      state = state.copyWith(
-        isInitializing: false,
-        hasToken: true,  // 👈 هذا هو المفتاح
-      );
-      
-      // محاولة جلب بيانات المستخدم في الخلفية (اختياري)
-      _fetchUserProfileInBackground();
-      
-      return;
+      UserModel? cachedUser;
+      if (cachedUserData != null) {
+        try {
+          cachedUser = UserModel.fromJson(jsonDecode(cachedUserData));
+          debugPrint('👤 تم تحميل بيانات المستخدم من الكاش: ${cachedUser.email}');
+        } catch (e) {
+          debugPrint('❌ خطأ في فك تشفير بيانات المستخدم المخبأة: $e');
+        }
+      }
+
+      if (token != null) {
+        debugPrint('📱 تم العثور على توكن مخزن');
+        
+        state = state.copyWith(
+          isInitializing: false,
+          hasToken: true,
+          user: cachedUser,
+        );
+        
+        // محاولة جلب بيانات المستخدم في الخلفية لتحديث الكاش
+        _fetchUserProfileInBackground();
+        
+        return;
+      }
+    } catch (e) {
+      debugPrint('❌ AuthNotifier._loadSavedUser error: $e');
     }
-  } catch (e) {
-    debugPrint('❌ AuthNotifier._loadSavedUser error: $e');
+    
+    state = state.copyWith(isInitializing: false, hasToken: false);
   }
-  
-  state = state.copyWith(isInitializing: false, hasToken: false);
-}
+
+  // حفظ بيانات المستخدم في التخزين الآمن
+  Future<void> _saveUserToCache(UserModel user) async {
+    try {
+      await _secureStorage.write(
+        key: _kCachedUser, 
+        value: jsonEncode(user.toJson()),
+      );
+      debugPrint('💾 تم حفظ بيانات المستخدم في الكاش');
+    } catch (e) {
+      debugPrint('❌ فشل حفظ بيانات المستخدم في الكاش: $e');
+    }
+  }
 
 // جلب بيانات المستخدم في الخلفية (اختياري)
 Future<void> _fetchUserProfileInBackground() async {
   try {
     final response = await _authApi.getProfile();
     if (response['success'] == true && response.containsKey('user')) {
+      final user = UserModel.fromJson(response['user']);
       // تحديث state ببيانات المستخدم إذا وصلت
       state = state.copyWith(
-        user: UserModel.fromJson(response['user']),
+        user: user,
         hasToken: true,
       );
+      // تحديث الكاش المحلي
+      _saveUserToCache(user);
     }
   } catch (e) {
     // إذا فشل جلب البيانات، نبقى على hasToken = true
@@ -82,10 +111,11 @@ Future<void> _fetchUserProfileInBackground() async {
 
 
   Future<void> _clearTokens() async {
-  await sl<ApiClient>().clearTokens();
-  state = state.copyWith(clearUser: true, clearError: true, isInitializing: false);
-  debugPrint('🗑️ تم مسح التوكنات');
-}
+    await sl<ApiClient>().clearTokens();
+    await _secureStorage.delete(key: _kCachedUser);
+    state = state.copyWith(clearUser: true, clearError: true, isInitializing: false);
+    debugPrint('🗑️ تم مسح التوكنات وبيانات الكاش');
+  }
 
   // ── Public API ────────────────────────────────────────────────────────────
 
@@ -115,6 +145,7 @@ Future<void> _fetchUserProfileInBackground() async {
         
         final user = UserModel.fromJson(response['user'] ?? data?['user']);
         state = AuthState(isInitializing: false, isLoading: false, user: user);
+        _saveUserToCache(user);
         debugPrint('✅ تسجيل دخول ناجح للمستخدم: ${user.email}');
         return true;
       } else {
@@ -127,7 +158,12 @@ Future<void> _fetchUserProfileInBackground() async {
       }
     } catch (e) {
       debugPrint('❌ Login exception: $e');
-      state = AuthState(isInitializing: false, isLoading: false, error: 'تعذر الاتصال بالخادم');
+      final errorData = sl<ApiClient>().handleDioError(e);
+      state = AuthState(
+        isInitializing: false, 
+        isLoading: false, 
+        error: errorData['message'],
+      );
     }
     return false;
   }
@@ -171,7 +207,12 @@ Future<void> _fetchUserProfileInBackground() async {
       }
     } catch (e) {
       debugPrint('Register exception: $e');
-      state = AuthState(isInitializing: false, isLoading: false, error: 'حدث خطأ غير متوقع');
+      final errorData = sl<ApiClient>().handleDioError(e);
+      state = AuthState(
+        isInitializing: false, 
+        isLoading: false, 
+        error: errorData['message'],
+      );
     }
     return false;
   }
@@ -202,6 +243,7 @@ Future<void> _fetchUserProfileInBackground() async {
           if (data['user'] != null) {
             final user = UserModel.fromJson(data['user']);
             state = AuthState(isInitializing: false, isLoading: false, user: user);
+            _saveUserToCache(user);
           } else {
             state = state.copyWith(isLoading: false);
           }
@@ -217,7 +259,8 @@ Future<void> _fetchUserProfileInBackground() async {
       
     } catch (e) {
       debugPrint('VerifyOtp exception: $e');
-      state = state.copyWith(isLoading: false, error: 'حدث خطأ في الاتصال');
+      final errorData = sl<ApiClient>().handleDioError(e);
+      state = state.copyWith(isLoading: false, error: errorData['message']);
       return false;
     }
   }
@@ -278,7 +321,8 @@ Future<void> _fetchUserProfileInBackground() async {
       return false;
     } catch (e) {
       debugPrint('ForgotPassword exception: $e');
-      state = state.copyWith(isLoading: false, error: 'حدث خطأ في الاتصال بالخادم');
+      final errorData = sl<ApiClient>().handleDioError(e);
+      state = state.copyWith(isLoading: false, error: errorData['message']);
       return false;
     }
   }
@@ -301,7 +345,8 @@ Future<void> _fetchUserProfileInBackground() async {
       return false;
     } catch (e) {
       debugPrint('ConfirmResetPassword exception: $e');
-      state = state.copyWith(isLoading: false, error: 'حدث خطأ في الاتصال بالخادم');
+      final errorData = sl<ApiClient>().handleDioError(e);
+      state = state.copyWith(isLoading: false, error: errorData['message']);
       return false;
     }
   }
@@ -311,10 +356,12 @@ Future<void> _fetchUserProfileInBackground() async {
     try {
       final response = await _authApi.updateProfile(name: name, email: email);
       if (response['user'] != null) {
+        final user = UserModel.fromJson(response['user']);
         state = state.copyWith(
           isLoading: false,
-          user: UserModel.fromJson(response['user']),
+          user: user,
         );
+        _saveUserToCache(user);
         return true;
       }
       state = state.copyWith(
@@ -334,10 +381,12 @@ Future<void> _fetchUserProfileInBackground() async {
     try {
       final response = await _authApi.updateProfileImage(imagePath);
       if (response['user'] != null) {
+        final user = UserModel.fromJson(response['user']);
         state = state.copyWith(
           isLoading: false,
-          user: UserModel.fromJson(response['user']),
+          user: user,
         );
+        _saveUserToCache(user);
         return true;
       }
       state = state.copyWith(isLoading: false, error: 'فشل تحديث الصورة');

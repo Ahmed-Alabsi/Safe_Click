@@ -7,5 +7,5 @@ class GetScanHistoryUseCase {
   final ScanRepository _repository;
   GetScanHistoryUseCase(this._repository);
 
-  Future<List<ScanEntity>> call() => _repository.getScanHistory();
+  Future<List<ScanEntity>> call(String? userId) => _repository.getScanHistory(userId);
 }

@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'dart:io';
@@ -146,12 +146,11 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                         children: [
                           CircleAvatar(
                             radius: 60,
-                            backgroundImage: _selectedImage != null
+                            backgroundImage: (_selectedImage != null
                                 ? FileImage(_selectedImage!)
                                 : (user != null && user.profileImage != null
                                     ? NetworkImage(user.fullProfileImageUrl!)
-                                    : const AssetImage('assets/images/default_avatar.png')
-                                        as ImageProvider),
+                                    : null)) as ImageProvider?,
                             child: _selectedImage == null && (user == null || user.profileImage == null)
                                 ? Text(
                                     (user?.name != null && user!.name.isNotEmpty)

@@ -130,11 +130,11 @@ class ScanRepositoryImpl implements ScanRepository {
   }
 
   @override
-  Future<List<ScanEntity>> getScanHistory() async {
+  Future<List<ScanEntity>> getScanHistory(String? userId) async {
     try {
-      // 1. Load local history from SQLite
-      final localHistoryData = await _cache.getScansHistory();
-      debugPrint('📦 [History] Read from SQLite: ${localHistoryData.length} records');
+      // 1. Load local history from SQLite for specific user
+      final localHistoryData = await _cache.getScansHistory(userId);
+      debugPrint('📦 [History] Read from SQLite for user $userId: ${localHistoryData.length} records');
       
       // 2. Apply limit
       final limitedHistoryData = _limitHistory(localHistoryData);
@@ -147,33 +147,37 @@ class ScanRepositoryImpl implements ScanRepository {
   }
 
   @override
-  Future<List<ScanEntity>> syncHistoryFromRemote() async {
+  Future<List<ScanEntity>> syncHistoryFromRemote(String? userId) async {
     try {
       final response = await _remote.getScanHistory();
       if (response['success'] == true) {
         final List<dynamic> historyData = response['history'] ?? [];
+        
+        // Convert to models first
         final entities = historyData
             .map((data) => _toEntity(ScanResult.fromJson(data)))
             .toList();
         
-        // Clear local history to ensure it matches remote state exactly
-        await _cache.hardDeleteAllScans();
+        // Clear local history for this user only
+        await _cache.clearUserHistory(userId);
         
         // Convert to models for storage
         final models = entities.map(_toModel).toList();
         final modelsData = models.map((m) => m.toJson()).toList().cast<Map<String, dynamic>>();
 
         // Save to SQLite
-        await _cache.saveScansHistory(modelsData);
-        debugPrint('🔄 [History] Synced ${modelsData.length} records from server to SQLite');
+        await _cache.saveScansHistory(modelsData, userId);
+        debugPrint('🔄 [History] Synced ${modelsData.length} records from server for user $userId');
         
         // Return latest from local DB
-        return getScanHistory();
+        return getScanHistory(userId);
+      } else {
+        throw Exception(response['message'] ?? 'فشل مزامنة السجل');
       }
     } catch (e) {
       debugPrint('🔴 [History] Remote sync failed: $e');
+      rethrow; // Important: rethrow so Notifier knows it failed
     }
-    return [];
   }
 
   Future<bool> softDeleteScan(String id) async {
@@ -192,13 +196,13 @@ class ScanRepositoryImpl implements ScanRepository {
   }
 
   @override
-  Future<bool> clearUserHistory() async {
+  Future<bool> clearUserHistory(String? userId) async {
     try {
-      await _cache.clearUserHistory();
+      await _cache.clearUserHistory(userId);
       
       // Sync with server
       final response = await _remote.clearHistory();
-      debugPrint('✅ [SoftDelete] All scans hidden from user (Remote: ${response['success']})');
+      debugPrint('✅ [SoftDelete] All scans hidden for user $userId (Remote: ${response['success']})');
       
       return true;
     } catch (e) {
@@ -208,13 +212,13 @@ class ScanRepositoryImpl implements ScanRepository {
   }
 
   @override
-  Future<void> saveHistory(List<ScanEntity> history) async {
+  Future<void> saveHistory(List<ScanEntity> history, String? userId) async {
     try {
       final models = history.map(_toModel).toList();
       final modelsData = models.map((m) => m.toJson()).toList().cast<Map<String, dynamic>>();
       
-      await _cache.saveScansHistory(modelsData);
-      debugPrint('💾 [Save] Saved ${modelsData.length} records to local storage');
+      await _cache.saveScansHistory(modelsData, userId);
+      debugPrint('💾 [Save] Saved ${modelsData.length} records for user $userId');
     } catch (e) {
       debugPrint('🔴 [Save] Failed to save history: $e');
       rethrow;

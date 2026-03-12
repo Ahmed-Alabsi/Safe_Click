@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:safeclik/features/auth/presentation/providers/auth_controller.dart';
 import 'package:safeclik/features/scan/presentation/controllers/scan_notifier.dart';
@@ -19,12 +19,28 @@ class ProfileScreen extends ConsumerWidget {
       child: Scaffold(
         backgroundColor: theme.scaffoldBackgroundColor,
         body: user == null
-            ? const Center(child: CircularProgressIndicator())
-            : SingleChildScrollView(
-                physics: const BouncingScrollPhysics(),
-                child: Column(
-                  children: [
-                    _buildProfileHeader(context, user, theme, ref),
+            ? (authState.hasToken 
+                ? const Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        CircularProgressIndicator(),
+                        SizedBox(height: 16),
+                        Text('جاري تحميل الملف الشخصي...'),
+                      ],
+                    ),
+                  )
+                : const Center(child: Text('الرجاء تسجيل الدخول')))
+            : RefreshIndicator(
+                onRefresh: () async {
+                  // تحديث البيانات من السيرفر
+                  ref.invalidate(authProvider);
+                },
+                child: SingleChildScrollView(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  child: Column(
+                    children: [
+                      _buildProfileHeader(context, user, theme, ref),
                     const SizedBox(height: 24),
                     _buildAccountInfoCard(context, user, theme),
                     const SizedBox(height: 30),
@@ -40,6 +56,7 @@ class ProfileScreen extends ConsumerWidget {
                   ],
                 ),
               ),
+        ),
       ),
     );
   }

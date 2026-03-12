@@ -20,6 +20,7 @@ import 'scan_state.dart';
 final scanNotifierProvider = StateNotifierProvider<ScanNotifier, ScanState>(
   (ref) {
     final notifier = ScanNotifier(
+      ref: ref,
       scanLinkUseCase: sl<ScanLinkUseCase>(),
       getHistoryUseCase: sl<GetScanHistoryUseCase>(),
       deleteUseCase: sl<DeleteScanUseCase>(),
@@ -50,15 +51,18 @@ class ScanNotifier extends StateNotifier<ScanState> {
   final ClearHistoryUseCase _clearUseCase;
   final SaveHistoryUseCase _saveHistoryUseCase;
   final ScanRepositoryImpl _repo;
+  final Ref _ref;
 
   ScanNotifier({
+    required Ref ref,
     required ScanLinkUseCase scanLinkUseCase,
     required GetScanHistoryUseCase getHistoryUseCase,
     required DeleteScanUseCase deleteUseCase,
     required ClearHistoryUseCase clearUseCase,
     required SaveHistoryUseCase saveHistoryUseCase,
     required ScanRepositoryImpl repo,
-  })  : _scanLinkUseCase = scanLinkUseCase,
+  })  : _ref = ref,
+        _scanLinkUseCase = scanLinkUseCase,
         _getHistoryUseCase = getHistoryUseCase,
         _deleteUseCase = deleteUseCase,
         _clearUseCase = clearUseCase,
@@ -104,14 +108,15 @@ class ScanNotifier extends StateNotifier<ScanState> {
       history.where((s) => s.safe == false).length;
 
   Future<void> _loadHistory() async {
+    final userId = _ref.read(authProvider).user?.id;
     try {
-      final entities = await _getHistoryUseCase();
+      final entities = await _getHistoryUseCase(userId);
       final results = entities.map(_toResult).toList();
       state = state.copyWith(
         scanHistory: results,
         dangerousScans: _countDangerous(results),
       );
-      debugPrint('📂 [Load] Loaded ${results.length} records from local storage');
+      debugPrint('📂 [Load] Loaded ${results.length} records from local storage for user $userId');
     } catch (e) {
       debugPrint('⚠️ [Load] Error loading history: $e');
     }
@@ -119,23 +124,24 @@ class ScanNotifier extends StateNotifier<ScanState> {
   }
 
   Future<void> _syncHistoryFromServer() async {
+    final userId = _ref.read(authProvider).user?.id;
+    if (userId == null) return;
+    
     try {
-      final entities = await _repo.syncHistoryFromRemote();
+      final entities = await _repo.syncHistoryFromRemote(userId);
       if (!mounted) return;
       final results = entities.map(_toResult).toList();
       
-      if (results.length != state.scanHistory.length ||
-          (results.isNotEmpty && 
-           state.scanHistory.isNotEmpty && 
-           results.first.id != state.scanHistory.first.id)) {
-        state = state.copyWith(
-          scanHistory: results,
-          dangerousScans: _countDangerous(results),
-        );
-        debugPrint('🔄 [Sync] Updated from server: ${results.length} items');
-      }
+      // Update state with server data
+      state = state.copyWith(
+        scanHistory: results,
+        dangerousScans: _countDangerous(results),
+      );
+      debugPrint('🔄 [Sync] Updated from server: ${results.length} items');
+      
     } catch (e) {
-      debugPrint('🔴 [Sync] Background sync error: $e');
+      debugPrint('🔴 [Sync] Background sync failed: $e. Keeping local data.');
+      // Keep existing state if sync fails
     }
   }
 
@@ -160,7 +166,8 @@ class ScanNotifier extends StateNotifier<ScanState> {
         debugPrint('📊 [Limit] History trimmed to ${ScanRepository.maxHistoryItems} items');
       }
 
-      await _saveHistoryUseCase(newHistory.map(_toEntity).toList());
+      final userId = _ref.read(authProvider).user?.id;
+      await _saveHistoryUseCase(newHistory.map(_toEntity).toList(), userId);
 
       state = state.copyWith(
         scanHistory: newHistory,
@@ -179,15 +186,16 @@ class ScanNotifier extends StateNotifier<ScanState> {
   }
 
   Future<void> clearHistory() async {
-    debugPrint('🗑️ [Clear] Starting clear history...');
+    final userId = _ref.read(authProvider).user?.id;
+    debugPrint('🗑️ [Clear] Starting clear history for user $userId...');
     state = state.copyWith(isLoading: true);
     
     try {
-      final success = await _clearUseCase();
+      final success = await _clearUseCase(userId);
       debugPrint('🗑️ [Clear] UseCase result: $success');
       
       if (success) {
-        await _saveHistoryUseCase([]);
+        await _saveHistoryUseCase([], userId);
         
         state = state.copyWith(
           scanHistory: [],
@@ -198,7 +206,7 @@ class ScanNotifier extends StateNotifier<ScanState> {
         debugPrint('✅ [Clear] History cleared successfully');
       } else {
         // محاولة المسح المحلي
-        await _saveHistoryUseCase([]);
+        await _saveHistoryUseCase([], userId);
         
         state = state.copyWith(
           scanHistory: [],
@@ -211,7 +219,7 @@ class ScanNotifier extends StateNotifier<ScanState> {
       debugPrint('🔴 [Clear] Error: $e');
       
       try {
-        await _saveHistoryUseCase([]);
+        await _saveHistoryUseCase([], userId);
         state = state.copyWith(
           scanHistory: [],
           dangerousScans: 0,
@@ -262,11 +270,12 @@ Future<void> softDeleteScanResult(String id) async {
   }
 
   Future<void> clearUserHistory() async {
-    debugPrint('🗑️ [SoftDelete] Clearing all user history...');
+    final userId = _ref.read(authProvider).user?.id;
+    debugPrint('🗑️ [SoftDelete] Clearing all history for user $userId...');
     state = state.copyWith(isLoading: true);
     
     try {
-      final success = await _clearUseCase(); // This now does soft delete for all
+      final success = await _clearUseCase(userId); // This now does soft delete for all
       
       if (success) {
         state = state.copyWith(

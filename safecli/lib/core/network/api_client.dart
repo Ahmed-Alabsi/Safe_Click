@@ -229,41 +229,73 @@ class ApiClient {
 
   Map<String, dynamic> handleDioError(dynamic e) {
     if (e is DioException) {
-      // إذا كان الخطأ 401 (Unauthorized) - توكن منتهي
       if (e.response?.statusCode == 401) {
         return {
           'success': false, 
-          'message': 'انتهت صلاحية الجلسة، الرجاء تسجيل الدخول مرة أخرى'
+          'message': 'انتهت صلاحية الجلسة، يرجى تسجيل الدخول مرة أخرى'
         };
       }
       
-      if (e.type == DioExceptionType.connectionTimeout) {
-        return {'success': false, 'message': 'انتهت مهلة الاتصال - تأكد من تشغيل السيرفر وعنوان الـ IP'};
+      if (e.type == DioExceptionType.connectionTimeout || e.type == DioExceptionType.sendTimeout) {
+        return {
+          'success': false, 
+          'message': 'انتهت مهلة الاتصال بالخادم. يرجى التأكد من جودة الإنترنت وحالة السيرفر.'
+        };
       }
+      
       if (e.type == DioExceptionType.receiveTimeout) {
-        return {'success': false, 'message': 'الخادم استغرق وقتاً طويلاً للرد'};
+        return {
+          'success': false, 
+          'message': 'استغرق الخادم وقتاً أطول من المعتاد للرد. يرجى المحاولة لاحقاً.'
+        };
       }
+      
       if (e.type == DioExceptionType.connectionError || e.error is SocketException) {
         return {
           'success': false, 
-          'message': 'تعذر الاتصال بالخادم ($baseUrl).\nتأكد من عنوان الـ IP وصحة الاتصال.'
+          'message': 'تعذر الاتصال بالخادم. يرجى التأكد من أنك متصل بالإنترنت وأن الخادم قيد التشغيل.'
         };
       }
+
       if (e.response != null) {
+        final statusCode = e.response!.statusCode;
         final data = e.response!.data;
+
+        // Common Status Codes
+        if (statusCode == 404) {
+          return {'success': false, 'message': 'الرابط أو الخدمة المطلوبة غير متوفرة حالياً.'};
+        }
+        if (statusCode == 500) {
+          return {'success': false, 'message': 'حدث عطل فني في السيرفر. فريقنا يعمل على إصلاحه.'};
+        }
+        if (statusCode == 403) {
+          return {'success': false, 'message': 'ليس لديك صلاحية للقيام بهذا الإجراء.'};
+        }
+        if (statusCode == 429) {
+          return {'success': false, 'message': 'لقد قمت بالكثير من المحاولات. يرجى الانتظار قليلاً ثم المحاولة مرة أخرى.'};
+        }
+
         if (data is Map<String, dynamic>) {
-          String errorMessage = 'فشل الطلب';
+          // Check for specific backend error messages
+          if (data.containsKey('message')) {
+            return {'success': false, 'message': data['message']};
+          }
+          if (data.containsKey('detail')) {
+            return {'success': false, 'message': data['detail']};
+          }
           if (data.containsKey('errors')) {
             final errors = data['errors'];
-            if (errors is Map) errorMessage = errors.values.join('\n');
-            if (errors is List) errorMessage = errors.join('\n');
-          } else if (data.containsKey('message')) {
-            errorMessage = data['message'];
+            if (errors is Map) return {'success': false, 'message': errors.values.expand((v) => v is List ? v : [v]).join('\n')};
+            if (errors is List) return {'success': false, 'message': errors.join('\n')};
+            return {'success': false, 'message': errors.toString()};
           }
-          return {'success': false, 'message': errorMessage};
+          
+          // Fallback for Field Errors (Validation)
+          final fieldErrors = data.entries.where((e) => e.value is List).map((e) => e.value.join(', ')).join('\n');
+          if (fieldErrors.isNotEmpty) return {'success': false, 'message': fieldErrors};
         }
       }
     }
-    return {'success': false, 'message': 'حدث خطأ غير متوقع في الاتصال'};
+    return {'success': false, 'message': 'حدث خطأ غير متوقع. يرجى التأكد من الاتصال والمحاولة مرة أخرى.'};
   }
 }

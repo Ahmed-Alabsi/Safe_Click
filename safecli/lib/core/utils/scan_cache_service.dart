@@ -220,7 +220,7 @@ class ScanCacheEntry {
 
 class ScanCacheService {
   static const _dbName    = 'safeclick_cache.db';
-  static const _dbVersion = 3; // v3: adds url_cache table
+  static const _dbVersion = 4; // v4: adds user_id to scans table
 
   static const _urlCacheTable = 'url_cache';
   static const _scansTable    = 'scans';
@@ -252,6 +252,9 @@ class ScanCacheService {
         if (oldVersion < 3) {
           await _createUrlCacheTable(db);
         }
+        if (oldVersion < 4) {
+          await db.execute('ALTER TABLE $_scansTable ADD COLUMN user_id TEXT');
+        }
       },
       onOpen: (db) async {
         // Auto-purge expired cache entries on every DB open (app start).
@@ -264,6 +267,7 @@ class ScanCacheService {
     await db.execute('''
       CREATE TABLE IF NOT EXISTS $_scansTable (
         id         TEXT PRIMARY KEY,
+        user_id    TEXT,
         data       TEXT NOT NULL,
         is_deleted INTEGER DEFAULT 0
       )
@@ -437,10 +441,20 @@ class ScanCacheService {
   // scans table: Scan History (unchanged — preserves existing app behavior)
   // ─────────────────────────────────────────────────────────────────────────
 
-  Future<List<Map<String, dynamic>>> getScansHistory() async {
+  Future<List<Map<String, dynamic>>> getScansHistory(String? userId) async {
     try {
       final db   = await _database;
-      final rows = await db.query(_scansTable, where: 'is_deleted = 0');
+      
+      // If no userId, only return "global" or orphaned records (not ideal but safe for migration)
+      // If userId exists, return only records for that user
+      final rows = await db.query(
+        _scansTable, 
+        where: userId == null 
+            ? 'is_deleted = 0 AND user_id IS NULL' 
+            : 'is_deleted = 0 AND user_id = ?',
+        whereArgs: userId == null ? null : [userId],
+      );
+      
       return rows
           .map((r) => jsonDecode(r['data'] as String) as Map<String, dynamic>)
           .toList();
@@ -450,18 +464,20 @@ class ScanCacheService {
     }
   }
 
-  Future<void> saveScansHistory(List<Map<String, dynamic>> history) async {
+  Future<void> saveScansHistory(List<Map<String, dynamic>> history, String? userId) async {
     try {
       final db    = await _database;
       final batch = db.batch();
       for (final scanJson in history) {
         final id   = scanJson['id'] as String;
         final data = jsonEncode(scanJson);
+        
+        // Note: Using 'INSERT OR REPLACE' for maximum compatibility with older SQLite versions.
+        // This will overwrite the row and reset is_deleted to 0 as specified in the VALUES.
         batch.execute('''
-          INSERT INTO $_scansTable (id, data, is_deleted)
-          VALUES (?, ?, 0)
-          ON CONFLICT(id) DO UPDATE SET data=excluded.data
-        ''', [id, data]);
+          INSERT OR REPLACE INTO $_scansTable (id, user_id, data, is_deleted)
+          VALUES (?, ?, ?, 0)
+        ''', [id, userId, data]);
       }
       await batch.commit(noResult: true);
     } catch (e) {
@@ -483,10 +499,15 @@ class ScanCacheService {
     }
   }
 
-  Future<void> clearUserHistory() async {
+  Future<void> clearUserHistory(String? userId) async {
     try {
       final db = await _database;
-      await db.update(_scansTable, {'is_deleted': 1});
+      await db.update(
+        _scansTable, 
+        {'is_deleted': 1},
+        where: 'user_id = ?',
+        whereArgs: [userId],
+      );
     } catch (e) {
       debugPrint('⚠️ [LocalDB] clearUserHistory error: $e');
     }
@@ -504,9 +525,9 @@ class ScanCacheService {
   }
 
   /// Clears both url_cache and scans history. Useful for user logout / data reset.
-  Future<void> clearAll() async {
+  Future<void> clearAll(String? userId) async {
     await clearUrlCache();
-    await clearUserHistory();
+    await clearUserHistory(userId);
   }
 
   // ─────────────────────────────────────────────────────────────────────────

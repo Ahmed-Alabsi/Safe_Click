@@ -9,6 +9,6 @@ class SaveHistoryUseCase {
   final ScanRepository _repository;
   SaveHistoryUseCase(this._repository);
 
-  Future<void> call(List<ScanEntity> history) =>
-      _repository.saveHistory(history);
+  Future<void> call(List<ScanEntity> history, String? userId) =>
+      _repository.saveHistory(history, userId);
 }

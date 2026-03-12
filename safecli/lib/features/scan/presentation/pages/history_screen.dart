@@ -254,115 +254,128 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> with SingleTicker
       child: Scaffold(
         backgroundColor: theme.scaffoldBackgroundColor,
         body: SafeArea(
-          child: Column(
-            children: [
-              // رأس مخصص مع البحث
-              Padding(
-                padding: const EdgeInsets.fromLTRB(20, 20, 20, 10),
-                child: _isSearching 
-                    ? _buildSearchBar(theme)
-                    : _buildHeader(theme, scanHistory),
-              ),
-
-              // تبويبات أنيقة
-              if (!_isSearching)
-                Container(
-                  margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-                  padding: const EdgeInsets.all(6),
-                  decoration: BoxDecoration(
-                    color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
-                    borderRadius: BorderRadius.circular(100),
-                  ),
-                  child: Row(
-                    children: [
-                      _buildTabItem(
-                        index: 0,
-                        selectedIndex: selectedIndex,
-                        icon: Icons.list_alt_rounded,
-                        label: 'الكل',
-                        count: scanHistory.length,
-                        color: theme.colorScheme.primary,
-                      ),
-                      _buildTabItem(
-                        index: 1,
-                        selectedIndex: selectedIndex,
-                        icon: Icons.check_circle_rounded,
-                        label: 'آمن',
-                        count: scanHistory.where((s) => s.safe == true).length,
-                        color: theme.colorScheme.tertiary,
-                      ),
-                      _buildTabItem(
-                        index: 2,
-                        selectedIndex: selectedIndex,
-                        icon: Icons.warning_amber_rounded,
-                        label: 'مشبوه',
-                        count: scanHistory.where((s) => s.safe == null).length,
-                        color: theme.colorScheme.secondary,
-                      ),
-                      _buildTabItem(
-                        index: 3,
-                        selectedIndex: selectedIndex,
-                        icon: Icons.dangerous_rounded,
-                        label: 'خطر',
-                        count: scanHistory.where((s) => s.safe == false).length,
-                        color: theme.colorScheme.error,
-                      ),
-                    ],
-                  ),
-                ),
-
-              // عرض عدد نتائج البحث
-              if (_isSearching && searchQuery.isNotEmpty)
+          child: RefreshIndicator(
+            onRefresh: () async {
+              await ref.read(scanNotifierProvider.notifier).refreshHistory();
+            },
+            child: Column(
+              children: [
+                // رأس مخصص مع البحث
                 Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-                  child: Row(
-                    children: [
-                      Text(
-                        '🔍 نتائج البحث: ',
-                        style: theme.textTheme.labelLarge,
-                      ),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: theme.colorScheme.primary.withValues(alpha: 0.1),
-                          borderRadius: BorderRadius.circular(100),
-                        ),
-                        child: Text(
-                          '${filteredHistory.length}',
-                          style: theme.textTheme.labelLarge?.copyWith(
-                            color: theme.colorScheme.primary,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                      const Spacer(),
-                      if (filteredHistory.isEmpty && searchQuery.isNotEmpty)
-                        TextButton.icon(
-                          onPressed: _stopSearch,
-                          icon: const Icon(Icons.close, size: 16),
-                          label: const Text('إلغاء البحث'),
-                          style: TextButton.styleFrom(
-                            foregroundColor: theme.colorScheme.error,
-                          ),
-                        ),
-                    ],
-                  ),
+                  padding: const EdgeInsets.fromLTRB(20, 20, 20, 10),
+                  child: _isSearching 
+                      ? _buildSearchBar(theme)
+                      : _buildHeader(theme, scanHistory),
                 ),
 
-              // المحتوى الرئيسي
-              Expanded(
-                child: filteredHistory.isEmpty
-                    ? _buildEmptyState(theme, selectedIndex, searchQuery)
-                    : ListView.builder(
-                        padding: const EdgeInsets.all(20),
-                        itemCount: filteredHistory.length,
-                        itemBuilder: (context, index) {
-                          final scan = filteredHistory[index];
-                          return _buildHistoryCard(context, scan, ref);
-                        },
-                      ),
-              ),
-            ],
+                // تبويبات أنيقة
+                if (!_isSearching)
+                  Container(
+                    margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                    padding: const EdgeInsets.all(6),
+                    decoration: BoxDecoration(
+                      color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+                      borderRadius: BorderRadius.circular(100),
+                    ),
+                    child: Row(
+                      children: [
+                        _buildTabItem(
+                          index: 0,
+                          selectedIndex: selectedIndex,
+                          icon: Icons.list_alt_rounded,
+                          label: 'الكل',
+                          count: scanHistory.length,
+                          color: theme.colorScheme.primary,
+                        ),
+                        _buildTabItem(
+                          index: 1,
+                          selectedIndex: selectedIndex,
+                          icon: Icons.check_circle_rounded,
+                          label: 'آمن',
+                          count: scanHistory.where((s) => s.safe == true).length,
+                          color: theme.colorScheme.tertiary,
+                        ),
+                        _buildTabItem(
+                          index: 2,
+                          selectedIndex: selectedIndex,
+                          icon: Icons.warning_amber_rounded,
+                          label: 'مشبوه',
+                          count: scanHistory.where((s) => s.safe == null).length,
+                          color: theme.colorScheme.secondary,
+                        ),
+                        _buildTabItem(
+                          index: 3,
+                          selectedIndex: selectedIndex,
+                          icon: Icons.dangerous_rounded,
+                          label: 'خطر',
+                          count: scanHistory.where((s) => s.safe == false).length,
+                          color: theme.colorScheme.error,
+                        ),
+                      ],
+                    ),
+                  ),
+
+                // عرض عدد نتائج البحث
+                if (_isSearching && searchQuery.isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                    child: Row(
+                      children: [
+                        Text(
+                          '🔍 نتائج البحث: ',
+                          style: theme.textTheme.labelLarge,
+                        ),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: theme.colorScheme.primary.withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(100),
+                          ),
+                          child: Text(
+                            '${filteredHistory.length}',
+                            style: theme.textTheme.labelLarge?.copyWith(
+                              color: theme.colorScheme.primary,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                        const Spacer(),
+                        if (filteredHistory.isEmpty && searchQuery.isNotEmpty)
+                          TextButton.icon(
+                            onPressed: _stopSearch,
+                            icon: const Icon(Icons.close, size: 16),
+                            label: const Text('إلغاء البحث'),
+                            style: TextButton.styleFrom(
+                              foregroundColor: theme.colorScheme.error,
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+
+                // المحتوى الرئيسي
+                Expanded(
+                  child: filteredHistory.isEmpty
+                      ? SingleChildScrollView(
+                          physics: const AlwaysScrollableScrollPhysics(),
+                          child: Container(
+                            height: MediaQuery.of(context).size.height * 0.6,
+                            alignment: Alignment.center,
+                            child: _buildEmptyState(theme, selectedIndex, searchQuery),
+                          ),
+                        )
+                      : ListView.builder(
+                          physics: const AlwaysScrollableScrollPhysics(),
+                          padding: const EdgeInsets.all(20),
+                          itemCount: filteredHistory.length,
+                          itemBuilder: (context, index) {
+                            final scan = filteredHistory[index];
+                            return _buildHistoryCard(context, scan, ref);
+                          },
+                        ),
+                ),
+              ],
+            ),
           ),
         ),
       ),
