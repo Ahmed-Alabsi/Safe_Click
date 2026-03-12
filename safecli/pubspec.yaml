@@ -10,6 +10,9 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+
+
+  firebase_messaging: ^14.7.19
     
   app_links: ^3.5.1  # المكتبة الصحيحة
 

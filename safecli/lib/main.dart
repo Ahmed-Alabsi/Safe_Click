@@ -1,11 +1,13 @@
-﻿import 'package:flutter/material.dart';
+﻿// main.dart
+
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:app_links/app_links.dart';
 import 'dart:async';
 import 'package:firebase_core/firebase_core.dart';
-import 'firebase_options.dart';
-import 'package:onesignal_flutter/onesignal_flutter.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
+import 'firebase_options.dart'; 
 
 import 'package:safeclik/core/di/di.dart';
 import 'package:safeclik/core/utils/notification_service.dart';
@@ -28,6 +30,19 @@ import 'package:safeclik/features/report/presentation/pages/report_screen.dart';
 import 'package:safeclik/features/settings/presentation/pages/settings_screen.dart';
 import 'package:safeclik/features/auth/presentation/pages/forgot_password_screen.dart';
 
+// ✅ دالة معالجة الإشعارات في الخلفية (يجب أن تكون في أعلى مستوى)
+@pragma('vm:entry-point')
+Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
+  // تهيئة Firebase
+  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+  
+  print('📱 [خلفية] إشعار: ${message.notification?.title}');
+  print('📱 البيانات: ${message.data}');
+  
+  // هنا يمكنك حفظ الإشعار في قاعدة البيانات المحلية
+  // أو تحديث حالة التطبيق
+}
+
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
@@ -39,22 +54,21 @@ Future<void> main() async {
     options: DefaultFirebaseOptions.currentPlatform,
   );
 
-  // 3. تهيئة OneSignal
-  OneSignal.Debug.setLogLevel(OSLogLevel.verbose);
-  OneSignal.initialize('0f1794d8-2a8a-4bea-bc5e-e25784cebd69');
-  await OneSignal.Notifications.requestPermission(true);
+  // 3. إعداد معالج الإشعارات في الخلفية
+  FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
 
-  // 4. باقي التهيئات
+  // 4. تهيئة الـ DI (حقن التبعيات)
   await initDI();
+
+  // 5. تهيئة ApiClient
   await ApiClient.initialize();
+
+  // 6. تهيئة NotificationService (هذا سيقوم بكل شيء)
   await sl<NotificationService>().initialize();
 
+  // 7. تشغيل التطبيق
   runApp(const ProviderScope(child: MyApp()));
 }
-
-// باقي الكود (MyApp, _MyAppState) يبقى كما هو...
-
-// باقي الكود كما هو...
 
 class MyApp extends ConsumerStatefulWidget {
   const MyApp({super.key});
@@ -68,11 +82,46 @@ class _MyAppState extends ConsumerState<MyApp> {
   StreamSubscription<Uri>? _linkSubscription;
   String? _pendingLink;
   bool _processingDeepLink = false;
+  
+  // للإشعارات
+  StreamSubscription<RemoteMessage>? _notificationSubscription;
 
   @override
   void initState() {
     super.initState();
     _initDeepLinks();
+    _listenToNotifications();
+  }
+
+  // ✅ الاستماع للإشعارات الواردة
+  void _listenToNotifications() {
+    _notificationSubscription = sl<NotificationService>().onFirebaseMessageReceived.listen((message) {
+      debugPrint('📱 تم استقبال إشعار عبر الـ Stream');
+      
+      // هنا يمكنك تحديث الـ UI أو توجيه المستخدم
+      _handleNotificationNavigation(message);
+    });
+  }
+
+  // ✅ التعامل مع التنقل بناءً على الإشعار
+  void _handleNotificationNavigation(RemoteMessage message) {
+    // التحقق من وجود بيانات في الإشعار
+    final data = message.data;
+    if (data.containsKey('screen')) {
+      final screen = data['screen'];
+      final id = data['id'];
+      
+      debugPrint('📱 التوجه للشاشة: $screen بالمعرف: $id');
+      
+      // هنا يمكنك توجيه المستخدم للشاشة المناسبة
+      // مثلاً إذا كان الإشعار يريد فتح شاشة نتيجة معينة
+      if (mounted) {
+        // استخدم WidgetsBinding لإضافة تأخير بسيط
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          // مثلاً: _navigateToScreen(screen, id);
+        });
+      }
+    }
   }
 
   Future<void> _initDeepLinks() async {
@@ -86,7 +135,6 @@ class _MyAppState extends ConsumerState<MyApp> {
       _linkSubscription = _appLinks.allUriLinkStream.listen((Uri? uri) {
         if (uri != null) {
           debugPrint('📱 تم استقبال رابط: $uri');
-          // Update _pendingLink without calling setState to avoid MaterialApp rebuild
           _pendingLink = uri.toString();
           if (mounted) setState(() {});
         }
@@ -149,6 +197,7 @@ class _MyAppState extends ConsumerState<MyApp> {
   @override
   void dispose() {
     _linkSubscription?.cancel();
+    _notificationSubscription?.cancel();
     super.dispose();
   }
 
@@ -164,21 +213,27 @@ class _MyAppState extends ConsumerState<MyApp> {
       darkTheme: AppTheme.darkTheme,
       themeMode: isDarkMode ? ThemeMode.dark : ThemeMode.light,
       home: Consumer(
-  builder: (context, ref, child) {
-    final authState = ref.watch(authProvider);
-    
-    if (authState.isInitializing) {
-      return const SplashScreen();
-    }
+        builder: (context, ref, child) {
+          final authState = ref.watch(authProvider);
 
-    // ✅ هذا هو الشرط الحاسم
-    if (authState.isAuthenticated) {
-      return const HomeScreen();  // إذا كان هناك توكن أو مستخدم → الرئيسية
-    } else {
-      return const LoginScreen(); // إذا لا → تسجيل الدخول
-    }
-  },
-),
+          if (authState.isInitializing) {
+            return const SplashScreen();
+          }
+
+          // معالجة الرابط المعلق إذا كان المستخدم مسجل دخول
+          if (authState.isAuthenticated && _pendingLink != null) {
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              _handlePendingLink(context);
+            });
+          }
+
+          if (authState.isAuthenticated) {
+            return const HomeScreen();
+          } else {
+            return const LoginScreen();
+          }
+        },
+      ),
       routes: {
         '/login': (context) => const LoginScreen(),
         '/register': (context) => const RegisterScreen(),
@@ -193,7 +248,6 @@ class _MyAppState extends ConsumerState<MyApp> {
       },
       onGenerateRoute: (settings) {
         if (settings.name == '/result') {
-          // Phase 1 Fix #2: Safe nullable cast — no more runtime TypeError
           final scanResult = settings.arguments as ScanResult?;
           if (scanResult == null) {
             return MaterialPageRoute(
