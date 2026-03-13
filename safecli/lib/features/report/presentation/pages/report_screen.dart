@@ -38,20 +38,20 @@ class _ReportScreenState extends ConsumerState<ReportScreen> with SingleTickerPr
   ];
 
   final List<Map<String, dynamic>> _severityLevels = [
-    {'value': 1, 'label': 'منخفض'},
-    {'value': 2, 'label': 'متوسط'},
-    {'value': 3, 'label': 'عالي'},
-    {'value': 4, 'label': 'خطير'},
-    {'value': 5, 'label': 'حرج'},
+    {'value': 1, 'label': 'منخفض', 'color': Colors.green},
+    {'value': 2, 'label': 'متوسط', 'color': Colors.blue},
+    {'value': 3, 'label': 'عالي', 'color': Colors.orange},
+    {'value': 4, 'label': 'خطير', 'color': Colors.deepOrange},
+    {'value': 5, 'label': 'حرج', 'color': Colors.red},
   ];
 
   Color _getSeverityColor(BuildContext context, int severity) {
     switch (severity) {
-      case 1: return Theme.of(context).colorScheme.tertiary;
-      case 2: return Theme.of(context).colorScheme.primary;
-      case 3: return Theme.of(context).colorScheme.secondary;
-      case 4: return Theme.of(context).colorScheme.error;
-      case 5: return Theme.of(context).colorScheme.error;
+      case 1: return Colors.green;
+      case 2: return Colors.blue;
+      case 3: return Colors.orange;
+      case 4: return Colors.deepOrange;
+      case 5: return Colors.red;
       default: return Theme.of(context).colorScheme.primary;
     }
   }
@@ -80,41 +80,65 @@ class _ReportScreenState extends ConsumerState<ReportScreen> with SingleTickerPr
   Widget build(BuildContext context) {
     final reportState = ref.watch(reportProvider);
     final reports = reportState.value ?? [];
+    final theme = Theme.of(context);
 
-    return Scaffold(
-      body: Directionality(
-        textDirection: TextDirection.rtl,
-        child: Container(
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
-              colors: [
-                Theme.of(context).colorScheme.tertiary,
-                Theme.of(context).colorScheme.surface,
-              ],
-            ),
-          ),
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              children: [
-                _buildHeader(context, reports.length),
-                const SizedBox(height: 20),
-                _buildForm(context),
-                const SizedBox(height: 20),
-                _buildGuidelines(context),
-                const SizedBox(height: 20),
-                _buildErrorWidget(context),
-              ],
-            ),
+    return Directionality(
+      textDirection: TextDirection.rtl,
+      child: Scaffold(
+        backgroundColor: theme.scaffoldBackgroundColor,
+        // appBar: AppBar(
+        //   backgroundColor: Colors.transparent,
+        //   elevation: 0,
+        //   leading: Container(
+        //     margin: const EdgeInsets.all(8),
+        //     decoration: BoxDecoration(
+        //       color: theme.colorScheme.primary.withValues(alpha: 0.1),
+        //       borderRadius: BorderRadius.circular(12),
+        //     ),
+        //     child: IconButton(
+        //       icon: Icon(Icons.arrow_back_rounded, color: theme.colorScheme.primary),
+        //       onPressed: () => Navigator.pop(context),
+        //     ),
+        //   ),
+        //   title: Text(
+        //     'الإبلاغ عن رابط',
+        //     style: theme.textTheme.titleLarge?.copyWith(
+        //       fontWeight: FontWeight.bold,
+        //       color: theme.colorScheme.onSurface,
+        //     ),
+        //   ),
+        //   centerTitle: true,
+        //   actions: [
+        //     Container(
+        //       margin: const EdgeInsets.all(8),
+        //       decoration: BoxDecoration(
+        //         color: theme.colorScheme.primary.withValues(alpha: 0.1),
+        //         borderRadius: BorderRadius.circular(12),
+        //       ),
+        //       child: _buildHistoryButton(context, reports.length),
+        //     ),
+        //   ],
+        // ),
+        body: SingleChildScrollView(
+          physics: const BouncingScrollPhysics(),
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            children: [
+              _buildHeader(context, reports.length),
+              const SizedBox(height: 24),
+              _buildForm(context),
+              const SizedBox(height: 24),
+              _buildGuidelines(context),
+              const SizedBox(height: 24),
+              _buildErrorWidget(context),
+            ],
           ),
         ),
       ),
     );
   }
 
-  // ✅ الهيدر مع زر السجل الاحترافي
+  // ✅ هيدر بارز وجميل
   Widget _buildHeader(BuildContext context, int reportsCount) {
     return Container(
       padding: const EdgeInsets.all(20),
@@ -186,6 +210,9 @@ class _ReportScreenState extends ConsumerState<ReportScreen> with SingleTickerPr
     );
   }
 
+  
+
+  // ✅ زر التاريخ البارز
   Widget _buildHistoryButton(BuildContext context, int count) {
     return InkWell(
       onTap: () => _showReportsBottomSheet(context),
@@ -231,147 +258,800 @@ class _ReportScreenState extends ConsumerState<ReportScreen> with SingleTickerPr
     );
   }
 
-  // ✅ تعديل مكان زر السجل ليكون مقابل "تفاصيل البلاغ"
+  // ✅ نموذج الإبلاغ البارز
   Widget _buildForm(BuildContext context) {
-    return Card(
-      elevation: 4,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-      child: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // عنوان تفاصيل البلاغ مع زر السجل مقابله
-            Row(
-              children: [
-                Text(
-                  'تفاصيل البلاغ',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    color: Theme.of(context).colorScheme.primary,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 20),
-            _buildLinkField(context),
-            const SizedBox(height: 20),
-            _buildCategoryField(context),
-            const SizedBox(height: 20),
-            _buildSeverityField(),
-            const SizedBox(height: 20),
-            _buildDescriptionField(context),
-            const SizedBox(height: 30),
-            _buildSubmitButton(),
-          ],
+    final theme = Theme.of(context);
+
+    return Container(
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        color: theme.cardTheme.color,
+        borderRadius: BorderRadius.circular(30),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.1),
+            blurRadius: 20,
+            offset: const Offset(0, 8),
+            spreadRadius: 2,
+          ),
+        ],
+        border: Border.all(
+          color: theme.colorScheme.primary.withValues(alpha: 0.2),
+          width: 2,
         ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [
+                      theme.colorScheme.primary,
+                      theme.colorScheme.secondary,
+                    ],
+                  ),
+                  borderRadius: BorderRadius.circular(12),
+                  boxShadow: [
+                    BoxShadow(
+                      color: theme.colorScheme.primary.withValues(alpha: 0.3),
+                      blurRadius: 8,
+                      offset: const Offset(0, 3),
+                    ),
+                  ],
+                ),
+                child: const Icon(
+                  Icons.edit_note_rounded,
+                  color: Colors.white,
+                  size: 22,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Text(
+                'تفاصيل البلاغ',
+                style: theme.textTheme.titleLarge?.copyWith(
+                  fontWeight: FontWeight.bold,
+                  color: theme.colorScheme.onSurface,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 24),
+          _buildLinkField(context),
+          const SizedBox(height: 20),
+          _buildCategoryField(context),
+          const SizedBox(height: 20),
+          _buildSeverityField(),
+          const SizedBox(height: 20),
+          _buildDescriptionField(context),
+          const SizedBox(height: 30),
+          _buildSubmitButton(),
+        ],
       ),
     );
   }
 
-  // ✅ دالة عرض سجل البلاغات في BottomSheet
+  // ✅ حقل الرابط البارز
+  Widget _buildLinkField(BuildContext context) {
+  final theme = Theme.of(context);
+  final isFocused = _linkFocusNode.hasFocus;
+
+  return Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(4),
+            decoration: BoxDecoration(
+              color: theme.colorScheme.primary.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(6),
+            ),
+            child: Icon(Icons.link_rounded, size: 16, color: theme.colorScheme.primary),
+          ),
+          const SizedBox(width: 8),
+          Text(
+            'الرابط المشبوه',
+            style: theme.textTheme.titleSmall?.copyWith(
+              fontWeight: FontWeight.w600,
+              color: theme.colorScheme.onSurface,
+            ),
+          ),
+          const Text(
+            ' *',
+            style: TextStyle(color: Colors.red, fontSize: 16),
+          ),
+        ],
+      ),
+      const SizedBox(height: 8),
+      AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.05),
+              blurRadius: 8,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: TextField(
+          controller: _linkController,
+          focusNode: _linkFocusNode,
+          style: theme.textTheme.bodyMedium,
+          decoration: InputDecoration(
+            hintText: 'https://example.com',
+            hintStyle: theme.textTheme.bodyMedium?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.5),
+            ),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(16),
+              borderSide: BorderSide.none,
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(16),
+              borderSide: BorderSide(
+                color: theme.colorScheme.outline.withValues(alpha: 0.2),
+                width: 1,
+              ),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(16),
+              borderSide: BorderSide(
+                color: theme.colorScheme.primary.withValues(alpha: 0.3), // ✅ لون خفيف جداً بدلاً من الأزرق
+                width: 1.5,
+              ),
+            ),
+            filled: true,
+            fillColor: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.1),
+            prefixIcon: Icon(
+              Icons.link_rounded,
+              color: theme.colorScheme.primary.withValues(alpha: 0.7), // ✅ لون ثابت بدون تغيير
+            ),
+            suffixIcon: _linkController.text.isNotEmpty
+                ? IconButton(
+                    icon: Icon(
+                      Icons.close_rounded,
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                    onPressed: () => _linkController.clear(),
+                  )
+                : null,
+          ),
+          textDirection: TextDirection.ltr,
+          onTap: () => setState(() {}),
+          onChanged: (_) => setState(() {}),
+        ),
+      ),
+    ],
+  );
+}
+
+  // ✅ حقل نوع التهديد البارز
+  Widget _buildCategoryField(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(4),
+              decoration: BoxDecoration(
+                color: theme.colorScheme.primary.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(6),
+              ),
+              child: Icon(Icons.category_rounded, size: 16, color: theme.colorScheme.primary),
+            ),
+            const SizedBox(width: 8),
+            Text(
+              'نوع التهديد',
+              style: theme.textTheme.titleSmall?.copyWith(
+                fontWeight: FontWeight.w600,
+                color: theme.colorScheme.onSurface,
+              ),
+            ),
+            const Text(
+              ' *',
+              style: TextStyle(color: Colors.red, fontSize: 16),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        Container(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(16),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.05),
+                blurRadius: 8,
+                offset: const Offset(0, 2),
+              ),
+            ],
+          ),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            decoration: BoxDecoration(
+              color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(
+                color: theme.colorScheme.outline.withValues(alpha: 0.2),
+              ),
+            ),
+            child: DropdownButtonHideUnderline(
+              child: DropdownButton<String>(
+                value: _selectedCategory,
+                hint: Text(
+                  'اختر نوع التهديد',
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                ),
+                isExpanded: true,
+                icon: Container(
+                  padding: const EdgeInsets.all(4),
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.primary.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Icon(
+                    Icons.keyboard_arrow_down_rounded,
+                    color: theme.colorScheme.primary,
+                  ),
+                ),
+                dropdownColor: theme.colorScheme.surface,
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: theme.colorScheme.onSurface,
+                ),
+                items: _categories.map((category) {
+                  return DropdownMenuItem(
+                    value: category,
+                    child: Text(category),
+                  );
+                }).toList(),
+                onChanged: (value) => setState(() => _selectedCategory = value),
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  // ✅ حقل درجة الخطورة البارز
+  Widget _buildSeverityField() {
+    final theme = Theme.of(context);
+
+    return Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(4),
+            decoration: BoxDecoration(
+              color: theme.colorScheme.primary.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(6),
+            ),
+            child: Icon(Icons.speed_rounded, size: 16, color: theme.colorScheme.primary),
+          ),
+          const SizedBox(width: 8),
+          Text(
+            'درجة الخطورة',
+            style: theme.textTheme.titleSmall?.copyWith(
+              fontWeight: FontWeight.w600,
+              color: theme.colorScheme.onSurface,
+            ),
+          ),
+        ],
+      ),
+        const SizedBox(height: 12),
+        Container(
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            color: Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.1),
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(
+              color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.2),
+            ),
+          ),
+          child: Row(
+            children: _severityLevels.map((level) {
+              final isSelected = _selectedSeverity == level['value'];
+              final color = level['color'] as Color;
+              
+              return Expanded(
+                child: GestureDetector(
+                  onTap: () => setState(() => _selectedSeverity = level['value']),
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 200),
+                    margin: const EdgeInsets.symmetric(horizontal: 2),
+                    padding: const EdgeInsets.symmetric(vertical: 10),
+                    decoration: BoxDecoration(
+                      gradient: isSelected
+                          ? LinearGradient(
+                              colors: [
+                                color,
+                                color.withValues(alpha: 0.8),
+                              ],
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                            )
+                          : null,
+                      color: isSelected ? null : Colors.transparent,
+                      borderRadius: BorderRadius.circular(12),
+                      boxShadow: isSelected
+                          ? [
+                              BoxShadow(
+                                color: color.withValues(alpha: 0.4),
+                                blurRadius: 8,
+                                offset: const Offset(0, 3),
+                              ),
+                            ]
+                          : null,
+                    ),
+                    child: Column(
+                      children: [
+                        Text(
+                          level['value'].toString(),
+                          style: TextStyle(
+                            color: isSelected ? Colors.white : color,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 16,
+                          ),
+                        ),
+                        Text(
+                          level['label'],
+                          style: TextStyle(
+                            fontSize: 10,
+                            color: isSelected ? Colors.white : Theme.of(context).colorScheme.onSurfaceVariant,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              );
+            }).toList(),
+          ),
+        ),
+      ],
+    );
+  }
+
+  // ✅ حقل الوصف البارز
+  Widget _buildDescriptionField(BuildContext context) {
+  final theme = Theme.of(context);
+  final isFocused = _descriptionFocusNode.hasFocus;
+
+  return Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(4),
+            decoration: BoxDecoration(
+              color: theme.colorScheme.primary.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(6),
+            ),
+            child: Icon(Icons.description_rounded, size: 16, color: theme.colorScheme.primary),
+          ),
+          const SizedBox(width: 8),
+          Text(
+            'وصف إضافي',
+            style: theme.textTheme.titleSmall?.copyWith(
+              fontWeight: FontWeight.w600,
+              color: theme.colorScheme.onSurface,
+            ),
+          ),
+          Text(
+            ' (اختياري)',
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+          ),
+        ],
+      ),
+      const SizedBox(height: 8),
+      AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.05),
+              blurRadius: 8,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: TextField(
+          controller: _descriptionController,
+          focusNode: _descriptionFocusNode,
+          maxLines: 4,
+          maxLength: 500,
+          style: theme.textTheme.bodyMedium,
+          decoration: InputDecoration(
+            hintText: 'أضف أي تفاصيل إضافية عن الرابط...',
+            hintStyle: theme.textTheme.bodyMedium?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.5),
+            ),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(16),
+              borderSide: BorderSide.none,
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(16),
+              borderSide: BorderSide(
+                color: theme.colorScheme.outline.withValues(alpha: 0.2),
+                width: 1,
+              ),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(16),
+              borderSide: BorderSide(
+                color: theme.colorScheme.outline.withValues(alpha: 0.5), // ✅ لون رمادي عند التركيز
+                width: 1.5,
+              ),
+            ),
+            filled: true,
+            fillColor: isFocused
+                ? theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.15) // ✅ تغيير طفيف عند التركيز
+                : theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.1),
+            counterStyle: theme.textTheme.labelSmall?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+          ),
+          onTap: () => setState(() {}),
+        ),
+      ),
+    ],
+  );
+}
+
+  // ✅ زر الإرسال البارز
+  Widget _buildSubmitButton() {
+    final theme = Theme.of(context);
+
+    return Container(
+      width: double.infinity,
+      height: 56,
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [
+            theme.colorScheme.primary,
+            theme.colorScheme.secondary,
+          ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: theme.colorScheme.primary.withValues(alpha: 0.4),
+            blurRadius: 15,
+            offset: const Offset(0, 6),
+            spreadRadius: 1,
+          ),
+        ],
+      ),
+      child: ElevatedButton(
+        onPressed: _isSubmitting ? null : _submitReport,
+        style: ElevatedButton.styleFrom(
+          backgroundColor: Colors.transparent,
+          foregroundColor: Colors.white,
+          shadowColor: Colors.transparent,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
+          elevation: 0,
+        ),
+        child: _isSubmitting
+            ? const SizedBox(
+                height: 24,
+                width: 24,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                ),
+              )
+            : Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(Icons.send_rounded, size: 20),
+                  const SizedBox(width: 8),
+                  Text(
+                    'إرسال البلاغ',
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                    ),
+                  ),
+                ],
+              ),
+      ),
+    );
+  }
+
+  // ✅ إرشادات الإبلاغ البارزة
+  Widget _buildGuidelines(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [
+            theme.colorScheme.primary.withValues(alpha: 0.05),
+            theme.colorScheme.secondary.withValues(alpha: 0.05),
+          ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: theme.colorScheme.primary.withValues(alpha: 0.2),
+          width: 2,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [
+                      theme.colorScheme.primary,
+                      theme.colorScheme.secondary,
+                    ],
+                  ),
+                  borderRadius: BorderRadius.circular(10),
+                  boxShadow: [
+                    BoxShadow(
+                      color: theme.colorScheme.primary.withValues(alpha: 0.3),
+                      blurRadius: 8,
+                      offset: const Offset(0, 3),
+                    ),
+                  ],
+                ),
+                child: const Icon(
+                  Icons.info_rounded,
+                  color: Colors.white,
+                  size: 18,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Text(
+                'إرشادات الإبلاغ',
+                style: theme.textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.bold,
+                  color: theme.colorScheme.onSurface,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          _buildGuidelineItem(context, 'تأكد من صحة الرابط قبل الإبلاغ', Icons.check_circle_rounded),
+          _buildGuidelineItem(context, 'الإبلاغ الكاذب قد يعرضك للمساءلة', Icons.warning_amber_rounded),
+          _buildGuidelineItem(context, 'سيتم مراجعة البلاغ خلال 24 ساعة', Icons.access_time_rounded),
+          _buildGuidelineItem(context, 'يمكنك متابعة حالة البلاغ عبر رقم التتبع', Icons.track_changes_rounded),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildGuidelineItem(BuildContext context, String text, IconData icon) {
+    final theme = Theme.of(context);
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(4),
+            decoration: BoxDecoration(
+              color: theme.colorScheme.primary.withValues(alpha: 0.1),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(
+              icon,
+              size: 14,
+              color: theme.colorScheme.primary,
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              text,
+              style: theme.textTheme.bodyMedium,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildErrorWidget(BuildContext context) {
+    final reportNotifier = ref.read(reportProvider.notifier);
+    final lastError = reportNotifier.lastError;
+    if (lastError == null) return const SizedBox.shrink();
+    
+    final theme = Theme.of(context);
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.error.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: theme.colorScheme.error.withValues(alpha: 0.3),
+          width: 2,
+        ),
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(6),
+            decoration: BoxDecoration(
+              color: theme.colorScheme.error.withValues(alpha: 0.2),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(
+              Icons.error_outline_rounded,
+              color: theme.colorScheme.error,
+              size: 20,
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              lastError,
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: theme.colorScheme.error,
+              ),
+            ),
+          ),
+          Container(
+            decoration: BoxDecoration(
+              color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: IconButton(
+              icon: Icon(
+                Icons.close_rounded,
+                size: 18,
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+              onPressed: () {
+                reportNotifier.clearError();
+                setState(() {});
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ✅ باقي الدوال مع تحسينات بسيطة
   void _showReportsBottomSheet(BuildContext context) {
     final reportState = ref.read(reportProvider);
     final reports = reportState.value ?? [];
     final reportNotifier = ref.read(reportProvider.notifier);
+    final theme = Theme.of(context);
 
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(25)),
-      ),
+      backgroundColor: Colors.transparent,
       builder: (context) => Container(
-        height: MediaQuery.of(context).size.height * 0.75,
-        padding: const EdgeInsets.all(20),
+        height: MediaQuery.of(context).size.height * 0.8,
+        decoration: BoxDecoration(
+          color: theme.scaffoldBackgroundColor,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(30)),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.1),
+              blurRadius: 20,
+              offset: const Offset(0, -5),
+            ),
+          ],
+        ),
         child: Column(
           children: [
-            // مؤشر السحب
             Container(
+              margin: const EdgeInsets.only(top: 12),
               width: 50,
               height: 5,
               decoration: BoxDecoration(
-                color: Colors.grey[300],
+                color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.3),
                 borderRadius: BorderRadius.circular(10),
               ),
             ),
             const SizedBox(height: 20),
-            
-            // العنوان مع زر حذف الكل
-            Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: Icon(
-                    Icons.history_edu_rounded,
-                    color: Theme.of(context).colorScheme.primary,
-                    size: 24,
-                  ),
-                ),
-                const SizedBox(width: 12),
-                const Text(
-                  'سجل البلاغات',
-                  style: TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const SizedBox(width: 8),
-                IconButton(
-                  icon: const Icon(Icons.refresh, size: 20, color: Colors.blue),
-                  onPressed: () => ref.read(reportProvider.notifier).refreshReports(),
-                  tooltip: 'تحديث',
-                ),
-                const Spacer(),
-                
-                // زر حذف الكل
-                if (reports.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: Row(
+                children: [
                   Container(
+                    padding: const EdgeInsets.all(8),
                     decoration: BoxDecoration(
-                      color: Theme.of(context).colorScheme.error.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: IconButton(
-                      icon: Icon(
-                        Icons.delete_sweep,
-                        color: Theme.of(context).colorScheme.error,
+                      gradient: LinearGradient(
+                        colors: [
+                          theme.colorScheme.primary,
+                          theme.colorScheme.secondary,
+                        ],
                       ),
-                      onPressed: () {
-                        Navigator.pop(context); // إغلاق الـ BottomSheet
-                        _confirmClearAllReports(context, reportNotifier);
-                      },
-                      tooltip: 'حذف الكل',
+                      borderRadius: BorderRadius.circular(12),
+                      boxShadow: [
+                        BoxShadow(
+                          color: theme.colorScheme.primary.withValues(alpha: 0.3),
+                          blurRadius: 8,
+                          offset: const Offset(0, 3),
+                        ),
+                      ],
+                    ),
+                    child: const Icon(Icons.history_rounded, color: Colors.white, size: 22),
+                  ),
+                  const SizedBox(width: 12),
+                  Text(
+                    'سجل البلاغات',
+                    style: theme.textTheme.titleLarge?.copyWith(
+                      fontWeight: FontWeight.bold,
                     ),
                   ),
-              ],
+                  const Spacer(),
+                  if (reports.isNotEmpty)
+                    Container(
+                      decoration: BoxDecoration(
+                        color: theme.colorScheme.error.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: IconButton(
+                        icon: Icon(Icons.delete_sweep_rounded, color: theme.colorScheme.error),
+                        onPressed: () {
+                          Navigator.pop(context);
+                          _confirmClearAllReports(context, reportNotifier);
+                        },
+                      ),
+                    ),
+                ],
+              ),
             ),
             const Divider(height: 30),
-            
-            // قائمة البلاغات
             Expanded(
               child: reportState.when(
-                loading: () => const Center(
-                  child: CircularProgressIndicator(),
-                ),
+                loading: () => const Center(child: CircularProgressIndicator()),
                 error: (error, stack) => Center(
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Icon(
-                        Icons.error_outline,
-                        size: 48,
-                        color: Theme.of(context).colorScheme.error,
+                      Container(
+                        padding: const EdgeInsets.all(20),
+                        decoration: BoxDecoration(
+                          color: theme.colorScheme.error.withValues(alpha: 0.1),
+                          shape: BoxShape.circle,
+                        ),
+                        child: Icon(
+                          Icons.error_outline_rounded,
+                          size: 48,
+                          color: theme.colorScheme.error,
+                        ),
                       ),
-                      const SizedBox(height: 12),
+                      const SizedBox(height: 16),
                       Text(
                         'حدث خطأ في تحميل البلاغات',
-                        style: TextStyle(
-                          color: Theme.of(context).colorScheme.error,
+                        style: theme.textTheme.titleMedium?.copyWith(
+                          color: theme.colorScheme.error,
                         ),
                       ),
                     ],
@@ -383,25 +1063,30 @@ class _ReportScreenState extends ConsumerState<ReportScreen> with SingleTickerPr
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          Icon(
-                            Icons.inbox_outlined,
-                            size: 64,
-                            color: Theme.of(context).colorScheme.onSurfaceVariant.withValues(alpha: 0.3),
+                          Container(
+                            padding: const EdgeInsets.all(30),
+                            decoration: BoxDecoration(
+                              color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.1),
+                              shape: BoxShape.circle,
+                            ),
+                            child: Icon(
+                              Icons.inbox_outlined,
+                              size: 64,
+                              color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.3),
+                            ),
                           ),
-                          const SizedBox(height: 16),
+                          const SizedBox(height: 20),
                           Text(
                             'لا توجد بلاغات بعد',
-                            style: TextStyle(
-                              color: Theme.of(context).colorScheme.onSurfaceVariant,
-                              fontSize: 16,
+                            style: theme.textTheme.titleMedium?.copyWith(
+                              color: theme.colorScheme.onSurfaceVariant,
                             ),
                           ),
                           const SizedBox(height: 8),
                           Text(
                             'قم بإرسال بلاغ جديد ليظهر هنا',
-                            style: TextStyle(
-                              color: Theme.of(context).colorScheme.onSurfaceVariant.withValues(alpha: 0.7),
-                              fontSize: 14,
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: theme.colorScheme.onSurfaceVariant,
                             ),
                           ),
                         ],
@@ -410,6 +1095,7 @@ class _ReportScreenState extends ConsumerState<ReportScreen> with SingleTickerPr
                   }
 
                   return ListView.separated(
+                    padding: const EdgeInsets.symmetric(horizontal: 20),
                     itemCount: reports.length,
                     separatorBuilder: (_, __) => const SizedBox(height: 8),
                     itemBuilder: (context, index) => 
@@ -424,273 +1110,257 @@ class _ReportScreenState extends ConsumerState<ReportScreen> with SingleTickerPr
     );
   }
 
-  // ✅ بطاقة البلاغ المخصصة للـ BottomSheet مع ميزة التراجع
   Widget _buildBottomSheetReportCard(BuildContext context, ReportModel report, ReportNotifier notifier) {
-    final displayUrl = report.link.length > 35
-        ? '${report.link.substring(0, 32)}...'
-        : report.link;
+    final theme = Theme.of(context);
 
-    final date = report.reportDate;
-    final dateStr =
-        '${date.day}/${date.month}/${date.year}';
-
-    return Card(
-      elevation: 1,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      child: InkWell(
-        onTap: () => _showReportDetails(context, report),
-        borderRadius: BorderRadius.circular(12),
-        child: Padding(
-          padding: const EdgeInsets.all(12),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: theme.cardTheme.color,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.05),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+        border: Border.all(
+          color: theme.colorScheme.outline.withValues(alpha: 0.1),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
             children: [
-              // الصف العلوي: رقم التتبع والحالة وزر الحذف
-              Row(
-                children: [
-                  Expanded(
-                    child: Row(
-                      children: [
-                        Icon(
-                          Icons.tag,
-                          size: 14,
-                          color: Theme.of(context).colorScheme.primary,
-                        ),
-                        const SizedBox(width: 4),
-                        Expanded(
-                          child: Text(
-                            report.trackingNumber ?? 'بدون رقم',
-                            style: TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w500,
-                              color: Theme.of(context).colorScheme.primary,
-                            ),
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  _buildStatusBadge(context, report.status),
-                  const SizedBox(width: 8),
-                  Container(
-                    decoration: BoxDecoration(
-                      color: Theme.of(context).colorScheme.error.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(6),
-                    ),
-                    child: IconButton(
-                      icon: Icon(
-                        Icons.close,
-                        color: Theme.of(context).colorScheme.error,
-                        size: 16,
-                      ),
-                      onPressed: () {
-                        Navigator.pop(context); // إغلاق الـ BottomSheet
-                        _confirmDeleteReport(context, report, notifier);
-                      },
-                      constraints: const BoxConstraints(
-                        minWidth: 28,
-                        minHeight: 28,
-                      ),
-                      padding: EdgeInsets.zero,
-                    ),
-                  ),
-                ],
+              Container(
+                padding: const EdgeInsets.all(4),
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.primary.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Icon(Icons.tag_rounded, size: 12, color: theme.colorScheme.primary),
               ),
-              
-              const SizedBox(height: 8),
-              
-              // الرابط
-              Row(
-                children: [
-                  Icon(
-                    Icons.link,
-                    size: 14,
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  report.trackingNumber ?? 'بدون رقم',
+                  style: theme.textTheme.labelSmall?.copyWith(
+                    color: theme.colorScheme.primary,
+                    fontWeight: FontWeight.w600,
                   ),
-                  const SizedBox(width: 4),
-                  Expanded(
-                    child: Text(
-                      displayUrl,
-                      style: TextStyle(
-                        fontSize: 13,
-                        color: Theme.of(context).colorScheme.onSurface,
-                      ),
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                ],
+                  overflow: TextOverflow.ellipsis,
+                ),
               ),
-              
-              const SizedBox(height: 8),
-              
-              // الصف السفلي: التصنيف ودرجة الخطورة والتاريخ
-              Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                    decoration: BoxDecoration(
-                      color: Theme.of(context).colorScheme.secondaryContainer.withValues(alpha: 0.3),
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                    child: Text(
-                      report.category,
-                      style: TextStyle(
-                        fontSize: 10,
-                        color: Theme.of(context).colorScheme.onSecondaryContainer,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 6),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                    decoration: BoxDecoration(
-                      color: _getSeverityColor(context, report.severity).withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(4),
-                      border: Border.all(
-                        color: _getSeverityColor(context, report.severity).withValues(alpha: 0.2),
-                      ),
-                    ),
-                    child: Text(
-                      _getSeverityLabel(report.severity),
-                      style: TextStyle(
-                        fontSize: 10,
-                        color: _getSeverityColor(context, report.severity),
-                      ),
-                    ),
-                  ),
-                  const Spacer(),
-                  Row(
-                    children: [
-                      Icon(
-                        Icons.calendar_today_outlined,
-                        size: 10,
-                        color: Theme.of(context).colorScheme.onSurfaceVariant,
-                      ),
-                      const SizedBox(width: 2),
-                      Text(
-                        dateStr,
-                        style: TextStyle(
-                          fontSize: 10,
-                          color: Theme.of(context).colorScheme.onSurfaceVariant,
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
+              _buildStatusBadge(context, report.status),
+              const SizedBox(width: 8),
+              Container(
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.error.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: IconButton(
+                  icon: Icon(Icons.close_rounded, color: theme.colorScheme.error, size: 16),
+                  onPressed: () {
+                    Navigator.pop(context);
+                    _confirmDeleteReport(context, report, notifier);
+                  },
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
+                ),
               ),
             ],
           ),
+          const SizedBox(height: 8),
+          Text(
+            report.link,
+            style: theme.textTheme.bodySmall,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.secondaryContainer.withValues(alpha: 0.2),
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: Text(
+                  report.category,
+                  style: theme.textTheme.labelSmall?.copyWith(
+                    color: theme.colorScheme.onSecondaryContainer,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 6),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: _getSeverityColor(context, report.severity).withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: Text(
+                  _getSeverityLabel(report.severity),
+                  style: theme.textTheme.labelSmall?.copyWith(
+                    color: _getSeverityColor(context, report.severity),
+                  ),
+                ),
+              ),
+              const Spacer(),
+              Text(
+                '${report.reportDate.day}/${report.reportDate.month}/${report.reportDate.year}',
+                style: theme.textTheme.labelSmall?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _getSeverityLabel(int severity) {
+    switch (severity) {
+      case 1: return 'منخفض';
+      case 2: return 'متوسط';
+      case 3: return 'عالي';
+      case 4: return 'خطير';
+      case 5: return 'حرج';
+      default: return 'غير معروف';
+    }
+  }
+
+  Widget _buildStatusBadge(BuildContext context, String? status) {
+    final cfg = _statusConfig(status);
+    final theme = Theme.of(context);
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: cfg.$1.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(4),
+      ),
+      child: Text(
+        cfg.$2,
+        style: theme.textTheme.labelSmall?.copyWith(
+          color: cfg.$1,
+          fontWeight: FontWeight.w600,
         ),
       ),
     );
   }
 
-  // ✅ عرض تفاصيل البلاغ
+  (Color, String) _statusConfig(String? status) {
+    switch (status) {
+      case 'pending':
+        return (Colors.orange, 'قيد المراجعة');
+      case 'reviewing':
+        return (Colors.blue, 'قيد التحقيق');
+      case 'confirmed':
+        return (Colors.red, 'تم التأكيد');
+      case 'rejected':
+        return (Colors.grey, 'مرفوض');
+      case 'resolved':
+        return (Colors.green, 'تم الحل');
+      default:
+        return (Colors.orange, 'قيد المراجعة');
+    }
+  }
+
   void _showReportDetails(BuildContext context, ReportModel report) {
+    final theme = Theme.of(context);
+
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
+      backgroundColor: Colors.transparent,
       builder: (context) => Container(
-        padding: const EdgeInsets.all(20),
+        padding: const EdgeInsets.all(24),
+        decoration: BoxDecoration(
+          color: theme.scaffoldBackgroundColor,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(30)),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.1),
+              blurRadius: 20,
+              offset: const Offset(0, -5),
+            ),
+          ],
+        ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Center(
-              child: Container(
-                width: 50,
-                height: 5,
-                decoration: BoxDecoration(
-                  color: Colors.grey[300],
-                  borderRadius: BorderRadius.circular(10),
-                ),
+            Container(
+              width: 50,
+              height: 5,
+              decoration: BoxDecoration(
+                color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.3),
+                borderRadius: BorderRadius.circular(10),
               ),
             ),
             const SizedBox(height: 20),
-            
             Row(
               children: [
-                Icon(
-                  Icons.description,
-                  color: Theme.of(context).colorScheme.primary,
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [
+                        theme.colorScheme.primary,
+                        theme.colorScheme.secondary,
+                      ],
+                    ),
+                    borderRadius: BorderRadius.circular(12),
+                    boxShadow: [
+                      BoxShadow(
+                        color: theme.colorScheme.primary.withValues(alpha: 0.3),
+                        blurRadius: 8,
+                        offset: const Offset(0, 3),
+                      ),
+                    ],
+                  ),
+                  child: const Icon(Icons.description_rounded, color: Colors.white, size: 22),
                 ),
-                const SizedBox(width: 8),
+                const SizedBox(width: 12),
                 Text(
                   'تفاصيل البلاغ',
-                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                  style: theme.textTheme.titleLarge?.copyWith(
                     fontWeight: FontWeight.bold,
                   ),
                 ),
               ],
             ),
-            const Divider(height: 20),
-            
-            _buildDetailItem(
-              context,
-              icon: Icons.tag,
-              label: 'رقم التتبع',
-              value: report.trackingNumber ?? 'غير متوفر',
-              isSelectable: true,
-            ),
-            
-            _buildDetailItem(
-              context,
-              icon: Icons.link,
-              label: 'الرابط',
-              value: report.link,
-              isSelectable: true,
-            ),
-            
-            _buildDetailItem(
-              context,
-              icon: Icons.category,
-              label: 'نوع التهديد',
-              value: report.category,
-            ),
-            
-            _buildDetailItem(
-              context,
-              icon: Icons.speed,
-              label: 'درجة الخطورة',
-              value: _getSeverityLabel(report.severity),
-              valueColor: _getSeverityColor(context, report.severity),
-            ),
-            
-            _buildDetailItem(
-              context,
-              icon: Icons.info,
-              label: 'الحالة',
-              value: _statusConfig(report.status).$2,
-              valueColor: _statusConfig(report.status).$1,
-            ),
-            
-            _buildDetailItem(
-              context,
-              icon: Icons.calendar_today,
-              label: 'تاريخ الإبلاغ',
-              value: '${report.reportDate.year}/${report.reportDate.month.toString().padLeft(2, '0')}/${report.reportDate.day.toString().padLeft(2, '0')}',
-            ),
-            
-            if (report.description.isNotEmpty) ...[
-              const SizedBox(height: 16),
-              _buildDetailItem(
-                context,
-                icon: Icons.description,
-                label: 'وصف إضافي',
-                value: report.description,
-              ),
-            ],
-            
+            const Divider(height: 24),
+            _buildDetailItem(context, 'رقم التتبع', report.trackingNumber ?? 'غير متوفر', Icons.tag_rounded),
+            _buildDetailItem(context, 'الرابط', report.link, Icons.link_rounded, isSelectable: true),
+            _buildDetailItem(context, 'نوع التهديد', report.category, Icons.category_rounded),
+            _buildDetailItem(context, 'درجة الخطورة', _getSeverityLabel(report.severity), Icons.speed_rounded,
+                valueColor: _getSeverityColor(context, report.severity)),
+            _buildDetailItem(context, 'الحالة', _statusConfig(report.status).$2, Icons.info_rounded,
+                valueColor: _statusConfig(report.status).$1),
+            _buildDetailItem(context, 'تاريخ الإبلاغ', 
+                '${report.reportDate.year}/${report.reportDate.month}/${report.reportDate.day}', 
+                Icons.calendar_today_rounded),
+            if (report.description.isNotEmpty)
+              _buildDetailItem(context, 'وصف إضافي', report.description, Icons.description_rounded),
             const SizedBox(height: 20),
-            
             SizedBox(
               width: double.infinity,
               child: ElevatedButton(
                 onPressed: () => Navigator.pop(context),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: theme.colorScheme.primary,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  elevation: 4,
+                ),
                 child: const Text('إغلاق'),
               ),
             ),
@@ -700,15 +1370,10 @@ class _ReportScreenState extends ConsumerState<ReportScreen> with SingleTickerPr
     );
   }
 
-  // عنصر تفصيلي في عرض التفاصيل
-  Widget _buildDetailItem(
-    BuildContext context, {
-    required IconData icon,
-    required String label,
-    required String value,
-    Color? valueColor,
-    bool isSelectable = false,
-  }) {
+  Widget _buildDetailItem(BuildContext context, String label, String value, IconData icon,
+      {Color? valueColor, bool isSelectable = false}) {
+    final theme = Theme.of(context);
+
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8),
       child: Row(
@@ -717,10 +1382,10 @@ class _ReportScreenState extends ConsumerState<ReportScreen> with SingleTickerPr
           Container(
             padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
-              color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(8),
+              color: theme.colorScheme.primary.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(10),
             ),
-            child: Icon(icon, color: Theme.of(context).colorScheme.primary, size: 16),
+            child: Icon(icon, color: theme.colorScheme.primary, size: 16),
           ),
           const SizedBox(width: 12),
           Expanded(
@@ -729,28 +1394,25 @@ class _ReportScreenState extends ConsumerState<ReportScreen> with SingleTickerPr
               children: [
                 Text(
                   label,
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  style: theme.textTheme.labelSmall?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
                   ),
                 ),
-                const SizedBox(height: 2),
+                const SizedBox(height: 4),
                 if (isSelectable)
                   SelectableText(
                     value,
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w500,
-                      color: valueColor ?? Theme.of(context).colorScheme.onSurface,
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      fontWeight: FontWeight.w600,
+                      color: valueColor ?? theme.colorScheme.onSurface,
                     ),
                   )
                 else
                   Text(
                     value,
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w500,
-                      color: valueColor ?? Theme.of(context).colorScheme.onSurface,
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      fontWeight: FontWeight.w600,
+                      color: valueColor ?? theme.colorScheme.onSurface,
                     ),
                   ),
               ],
@@ -761,30 +1423,37 @@ class _ReportScreenState extends ConsumerState<ReportScreen> with SingleTickerPr
     );
   }
 
-  // ✅ تأكيد حذف بلاغ فردي مع ميزة التراجع
   Future<void> _confirmDeleteReport(BuildContext context, ReportModel report, ReportNotifier notifier) async {
     final shouldDelete = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
+        backgroundColor: Theme.of(context).colorScheme.surface,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: const Row(
           children: [
-            Icon(Icons.delete_outline, color: Colors.orange),
-            SizedBox(width: 10),
-            Text('حذف البلاغ'),
+            Icon(Icons.delete_outline, color: Colors.orange, size: 28),
+            SizedBox(width: 12),
+            Text('حذف البلاغ', style: TextStyle(fontWeight: FontWeight.bold)),
           ],
         ),
-        content: Text('هل أنت متأكد من حذف البلاغ رقم: ${report.trackingNumber ?? report.link.substring(0, 20)}...؟'),
+        content: Text('هل أنت متأكد من حذف هذا البلاغ؟'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
+            style: TextButton.styleFrom(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
             child: const Text('إلغاء'),
           ),
-          FilledButton(
+          ElevatedButton(
             onPressed: () => Navigator.pop(context, true),
-            style: FilledButton.styleFrom(
-              backgroundColor: Theme.of(context).colorScheme.error,
-              foregroundColor: Theme.of(context).colorScheme.onError,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              elevation: 4,
             ),
             child: const Text('حذف'),
           ),
@@ -794,22 +1463,12 @@ class _ReportScreenState extends ConsumerState<ReportScreen> with SingleTickerPr
 
     if (shouldDelete == true) {
       try {
-        // حفظ البلاغ المحذوف للتراجع
         _lastDeletedReport = report;
-        
-        // إلغاء أي تايمر سابق
         _undoTimer?.cancel();
-        
-        // حذف البلاغ محلياً فقط
         notifier.deleteReportLocally(report.id);
         
         if (!context.mounted) return;
         
-        final linkPreview = report.link.length > 30 
-            ? '${report.link.substring(0, 30)}...' 
-            : report.link;
-        
-        // إظهار رسالة نجاح الحذف مع زر التراجع (5 ثواني)
         ScaffoldMessenger.of(context).clearSnackBars();
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -824,73 +1483,29 @@ class _ReportScreenState extends ConsumerState<ReportScreen> with SingleTickerPr
                   child: const Icon(Icons.check, color: Colors.white, size: 16),
                 ),
                 const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Text(
-                        'تم حذف البلاغ',
-                        style: TextStyle(fontWeight: FontWeight.bold),
-                      ),
-                      Text(
-                        linkPreview,
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Colors.white.withValues(alpha: 0.9),
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      Text(
-                        'سيتم إغلاق هذه الرسالة بعد 5 ثواني',
-                        style: TextStyle(
-                          fontSize: 10,
-                          color: Colors.white.withValues(alpha: 0.7),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
+                const Expanded(child: Text('تم حذف البلاغ')),
               ],
             ),
             backgroundColor: Colors.green,
             behavior: SnackBarBehavior.floating,
-            duration: const Duration(seconds: 5),
+            duration: const Duration(seconds: 3),
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
             action: SnackBarAction(
               label: 'تراجع',
               textColor: Colors.white,
               onPressed: () {
-                // إعادة البلاغ المحذوف
                 if (_lastDeletedReport != null) {
                   notifier.addReportLocally(_lastDeletedReport!);
                   _lastDeletedReport = null;
                   _undoTimer?.cancel();
-                  
-                  // إظهار رسالة تأكيد التراجع
-                  ScaffoldMessenger.of(context).clearSnackBars();
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('تم التراجع عن الحذف'),
-                      backgroundColor: Colors.blue,
-                      behavior: SnackBarBehavior.floating,
-                      duration: Duration(seconds: 2),
-                    ),
-                  );
                 }
               },
             ),
           ),
         );
         
-        // تايمر لمسح البلاغ المحفوظ بعد انتهاء مدة التراجع
-        _undoTimer = Timer(const Duration(seconds: 5), () {
-          if (mounted) {
-            setState(() {
-              _lastDeletedReport = null;
-            });
-          }
+        _undoTimer = Timer(const Duration(seconds: 3), () {
+          if (mounted) setState(() => _lastDeletedReport = null);
         });
         
       } catch (e) {
@@ -912,46 +1527,40 @@ class _ReportScreenState extends ConsumerState<ReportScreen> with SingleTickerPr
     }
   }
 
-  // ✅ تأكيد حذف جميع البلاغات مع ميزة التراجع
   Future<void> _confirmClearAllReports(BuildContext context, ReportNotifier notifier) async {
     final currentReports = ref.read(reportProvider).value ?? [];
     
     final shouldClear = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
+        backgroundColor: Theme.of(context).colorScheme.surface,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: const Row(
           children: [
-            Icon(Icons.warning_amber_rounded, color: Colors.red),
-            SizedBox(width: 10),
-            Text('حذف جميع البلاغات'),
+            Icon(Icons.warning_amber_rounded, color: Colors.red, size: 28),
+            SizedBox(width: 12),
+            Text('حذف جميع البلاغات', style: TextStyle(fontWeight: FontWeight.bold)),
           ],
         ),
         content: Column(
           mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const Text('هل أنت متأكد من حذف جميع البلاغات السابقة؟'),
-            const SizedBox(height: 8),
+            const SizedBox(height: 12),
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: Theme.of(context).colorScheme.error.withValues(alpha: 0.1),
+                color: Colors.red.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Theme.of(context).colorScheme.error.withValues(alpha: 0.3)),
+                border: Border.all(color: Colors.red.withValues(alpha: 0.3)),
               ),
               child: Row(
                 children: [
-                  Icon(Icons.info_outline, size: 20, color: Theme.of(context).colorScheme.error),
+                  Icon(Icons.info_outline, color: Colors.red, size: 20),
                   const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      'سيتم حذف ${currentReports.length} بلاغ',
-                      style: TextStyle(
-                        color: Theme.of(context).colorScheme.error,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
+                  Text(
+                    'سيتم حذف ${currentReports.length} بلاغ',
+                    style: const TextStyle(color: Colors.red, fontWeight: FontWeight.bold),
                   ),
                 ],
               ),
@@ -961,13 +1570,20 @@ class _ReportScreenState extends ConsumerState<ReportScreen> with SingleTickerPr
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
+            style: TextButton.styleFrom(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
             child: const Text('إلغاء'),
           ),
-          FilledButton(
+          ElevatedButton(
             onPressed: () => Navigator.pop(context, true),
-            style: FilledButton.styleFrom(
-              backgroundColor: Theme.of(context).colorScheme.error,
-              foregroundColor: Theme.of(context).colorScheme.onError,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              elevation: 4,
             ),
             child: const Text('حذف الكل'),
           ),
@@ -977,15 +1593,11 @@ class _ReportScreenState extends ConsumerState<ReportScreen> with SingleTickerPr
 
     if (shouldClear == true) {
       try {
-        // حفظ البلاغات المحذوفة للتراجع
         final deletedReports = List<ReportModel>.from(currentReports);
-        
-        // حذف جميع البلاغات محلياً
         notifier.clearAllReportsLocally();
         
         if (!context.mounted) return;
         
-        // إظهار رسالة نجاح الحذف مع زر التراجع (5 ثواني)
         ScaffoldMessenger.of(context).clearSnackBars();
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -1000,49 +1612,13 @@ class _ReportScreenState extends ConsumerState<ReportScreen> with SingleTickerPr
                   child: const Icon(Icons.delete_sweep, color: Colors.white, size: 16),
                 ),
                 const SizedBox(width: 12),
-                const Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        'تم حذف جميع البلاغات',
-                        style: TextStyle(fontWeight: FontWeight.bold),
-                      ),
-                      Text(
-                        'سيتم إغلاق هذه الرسالة بعد 5 ثواني',
-                        style: TextStyle(fontSize: 10),
-                      ),
-                    ],
-                  ),
-                ),
+                const Expanded(child: Text('تم حذف جميع البلاغات')),
               ],
             ),
             backgroundColor: Colors.orange,
             behavior: SnackBarBehavior.floating,
-            duration: const Duration(seconds: 5),
+            duration: const Duration(seconds: 3),
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-            action: SnackBarAction(
-              label: 'تراجع',
-              textColor: Colors.white,
-              onPressed: () {
-                // إعادة جميع البلاغات المحذوفة
-                for (var report in deletedReports) {
-                  notifier.addReportLocally(report);
-                }
-                
-                // إظهار رسالة تأكيد التراجع
-                ScaffoldMessenger.of(context).clearSnackBars();
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text('تم التراجع عن حذف ${deletedReports.length} بلاغ'),
-                    backgroundColor: Colors.blue,
-                    behavior: SnackBarBehavior.floating,
-                    duration: const Duration(seconds: 2),
-                  ),
-                );
-              },
-            ),
           ),
         );
         
@@ -1059,435 +1635,19 @@ class _ReportScreenState extends ConsumerState<ReportScreen> with SingleTickerPr
     }
   }
 
-  Widget _buildLinkField(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          'الرابط المشبوه *',
-          style: TextStyle(
-            fontWeight: FontWeight.bold,
-            color: Theme.of(context).colorScheme.onSurface,
-          ),
-        ),
-        const SizedBox(height: 8),
-        TextField(
-          controller: _linkController,
-          focusNode: _linkFocusNode,
-          style: TextStyle(
-            color: Theme.of(context).colorScheme.onSurface,
-          ),
-          decoration: InputDecoration(
-            hintText: 'https://example.com',
-            hintStyle: TextStyle(
-              color: Theme.of(context).colorScheme.onSurfaceVariant.withValues(alpha: 0.5),
-            ),
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide(color: Theme.of(context).colorScheme.outlineVariant),
-            ),
-            enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide(color: Theme.of(context).colorScheme.outlineVariant),
-            ),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide(color: Theme.of(context).colorScheme.primary, width: 2),
-            ),
-            prefixIcon: Icon(
-              Icons.link,
-              color: _linkFocusNode.hasFocus
-                  ? Theme.of(context).colorScheme.primary
-                  : Theme.of(context).colorScheme.onSurfaceVariant,
-            ),
-            suffixIcon: IconButton(
-              icon: Icon(
-                Icons.clear,
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
-              ),
-              onPressed: () => _linkController.clear(),
-            ),
-          ),
-          textDirection: TextDirection.ltr,
-          onTap: () {
-            setState(() {});
-          },
-        ),
-      ],
-    );
-  }
-
-  Widget _buildCategoryField(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          'نوع التهديد *',
-          style: TextStyle(
-            fontWeight: FontWeight.bold,
-            color: Theme.of(context).colorScheme.onSurface,
-          ),
-        ),
-        const SizedBox(height: 8),
-        Container(
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(
-              color: Theme.of(context).colorScheme.outlineVariant,
-            ),
-          ),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12),
-            child: DropdownButtonHideUnderline(
-              child: DropdownButton<String>(
-                value: _selectedCategory,
-                hint: Text(
-                  'اختر نوع التهديد',
-                  style: TextStyle(
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
-                  ),
-                ),
-                isExpanded: true,
-                icon: Icon(
-                  Icons.arrow_drop_down,
-                  color: Theme.of(context).colorScheme.primary,
-                ),
-                dropdownColor: Theme.of(context).colorScheme.surface,
-                style: TextStyle(
-                  color: Theme.of(context).colorScheme.onSurface,
-                ),
-                items: _categories.map((category) {
-                  return DropdownMenuItem(
-                    value: category,
-                    child: Text(category),
-                  );
-                }).toList(),
-                onChanged: (value) {
-                  setState(() {
-                    _selectedCategory = value;
-                  });
-                },
-              ),
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildSeverityField() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text(
-          'درجة الخطورة',
-          style: TextStyle(fontWeight: FontWeight.bold),
-        ),
-        const SizedBox(height: 8),
-        Row(
-          children: _severityLevels.map((level) {
-            final isSelected = _selectedSeverity == level['value'];
-            final color = _getSeverityColor(context, level['value']);
-            
-            return Expanded(
-              child: GestureDetector(
-                onTap: () {
-                  setState(() {
-                    _selectedSeverity = level['value'];
-                  });
-                },
-                child: Container(
-                  margin: const EdgeInsets.symmetric(horizontal: 2),
-                  padding: const EdgeInsets.symmetric(vertical: 8),
-                  decoration: BoxDecoration(
-                    color: isSelected ? color : color.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(
-                      color: isSelected ? color : color.withValues(alpha: 0.3),
-                      width: isSelected ? 2 : 1,
-                    ),
-                  ),
-                  child: Column(
-                    children: [
-                      Text(
-                        level['value'].toString(),
-                        style: TextStyle(
-                          color: isSelected
-                              ? Theme.of(context).colorScheme.surface
-                              : color,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      Text(
-                        level['label'],
-                        style: TextStyle(
-                          fontSize: 10,
-                          color: isSelected
-                              ? Theme.of(context).colorScheme.surface
-                              : color,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            );
-          }).toList(),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildDescriptionField(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          'وصف إضافي (اختياري)',
-          style: TextStyle(
-            fontWeight: FontWeight.bold,
-            color: Theme.of(context).colorScheme.onSurface,
-          ),
-        ),
-        const SizedBox(height: 8),
-        TextField(
-          controller: _descriptionController,
-          focusNode: _descriptionFocusNode,
-          maxLines: 4,
-          maxLength: 500,
-          style: TextStyle(
-            color: Theme.of(context).colorScheme.onSurface,
-          ),
-          decoration: InputDecoration(
-            hintText: 'أضف أي تفاصيل إضافية عن الرابط...',
-            hintStyle: TextStyle(
-              color: Theme.of(context).colorScheme.onSurfaceVariant.withValues(alpha: 0.5),
-            ),
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide(color: Theme.of(context).colorScheme.outlineVariant),
-            ),
-            enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide(color: Theme.of(context).colorScheme.outlineVariant),
-            ),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide(color: Theme.of(context).colorScheme.primary, width: 2),
-            ),
-            counterStyle: TextStyle(
-              color: Theme.of(context).colorScheme.onSurfaceVariant.withValues(alpha: 0.5),
-              fontSize: 12,
-            ),
-          ),
-          onTap: () {
-            setState(() {});
-          },
-        ),
-      ],
-    );
-  }
-
-  Widget _buildSubmitButton() {
-    return SizedBox(
-      width: double.infinity,
-      height: 55,
-      child: ElevatedButton.icon(
-        onPressed: _isSubmitting ? null : _submitReport,
-        icon: const Icon(Icons.send),
-        label: _isSubmitting
-            ? SizedBox(
-                height: 20,
-                width: 20,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2,
-                  valueColor: AlwaysStoppedAnimation<Color>(Theme.of(context).colorScheme.onPrimary),
-                ),
-              )
-            : const Text(
-                'إرسال البلاغ',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-              ),
-        style: ElevatedButton.styleFrom(
-          padding: const EdgeInsets.symmetric(vertical: 15),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildGuidelines(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.primaryContainer.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.3),
-        ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(
-                Icons.info,
-                color: Theme.of(context).colorScheme.primary,
-              ),
-              const SizedBox(width: 8),
-              Text(
-                'إرشادات الإبلاغ',
-                style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                  color: Theme.of(context).colorScheme.primary,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 10),
-          _buildGuidelineItem(context, 'تأكد من صحة الرابط قبل الإبلاغ'),
-          _buildGuidelineItem(context, 'الإبلاغ الكاذب قد يعرضك للمساءلة'),
-          _buildGuidelineItem(context, 'سيتم مراجعة البلاغ خلال 24 ساعة'),
-          _buildGuidelineItem(context, 'يمكنك متابعة حالة البلاغ عبر رقم التتبع'),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildGuidelineItem(BuildContext context, String text) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
-      child: Row(
-        children: [
-          Icon(
-            Icons.check_circle,
-            size: 16,
-            color: Theme.of(context).colorScheme.primary,
-          ),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Text(
-              text,
-              style: TextStyle(
-                fontSize: 12,
-                color: Theme.of(context).colorScheme.onSurface,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildErrorWidget(BuildContext context) {
-    final reportNotifier = ref.read(reportProvider.notifier);
-    final lastError = reportNotifier.lastError;
-    if (lastError == null) return const SizedBox.shrink();
-
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.error.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: Theme.of(context).colorScheme.error.withValues(alpha: 0.3),
-        ),
-      ),
-      child: Row(
-        children: [
-          Icon(
-            Icons.error_outline,
-            color: Theme.of(context).colorScheme.error,
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Text(
-              lastError,
-              style: TextStyle(
-                color: Theme.of(context).colorScheme.error,
-              ),
-            ),
-          ),
-          IconButton(
-            icon: Icon(
-              Icons.close,
-              size: 20,
-              color: Theme.of(context).colorScheme.onSurfaceVariant,
-            ),
-            onPressed: () {
-              reportNotifier.clearError();
-              setState(() {});
-            },
-          ),
-        ],
-      ),
-    );
-  }
-
-  String _getSeverityLabel(int severity) {
-    switch (severity) {
-      case 1: return 'منخفض';
-      case 2: return 'متوسط';
-      case 3: return 'عالي';
-      case 4: return 'خطير';
-      case 5: return 'حرج';
-      default: return 'غير معروف';
-    }
-  }
-
-  Widget _buildStatusBadge(BuildContext context, String? status) {
-    final cfg = _statusConfig(status);
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-      decoration: BoxDecoration(
-        color: cfg.$1.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: cfg.$1.withValues(alpha: 0.3)),
-      ),
-      child: Text(
-        cfg.$2,
-        style: TextStyle(
-          fontSize: 9,
-          fontWeight: FontWeight.bold,
-          color: cfg.$1,
-        ),
-      ),
-    );
-  }
-
-  (Color, String) _statusConfig(String? status) {
-    switch (status) {
-      case 'pending':
-        return (const Color(0xFFE67E22), 'قيد المراجعة');
-      case 'reviewing':
-        return (const Color(0xFF2980B9), 'قيد التحقيق');
-      case 'confirmed':
-        return (const Color(0xFFC0392B), 'تم التأكيد');
-      case 'rejected':
-        return (const Color(0xFF7F8C8D), 'مرفوض');
-      case 'resolved':
-        return (const Color(0xFF27AE60), 'تم الحل');
-      default:
-        return (const Color(0xFFE67E22), 'قيد المراجعة');
-    }
-  }
-
   Future<void> _submitReport() async {
     if (_linkController.text.trim().isEmpty) {
-      showSnackBar('يرجى إدخال الرابط المشبوه', Theme.of(context).colorScheme.error);
+      _showSnackBar('يرجى إدخال الرابط المشبوه', true);
       return;
     }
 
     if (_selectedCategory == null) {
-      showSnackBar('يرجى اختيار نوع التهديد', Theme.of(context).colorScheme.error);
+      _showSnackBar('يرجى اختيار نوع التهديد', true);
       return;
     }
 
     if (!_isValidUrl(_linkController.text)) {
-      showSnackBar('الرابط غير صحيح', Theme.of(context).colorScheme.error);
+      _showSnackBar('الرابط غير صحيح', true);
       return;
     }
 
@@ -1509,14 +1669,11 @@ class _ReportScreenState extends ConsumerState<ReportScreen> with SingleTickerPr
     if (success && mounted) {
       await Future.delayed(const Duration(milliseconds: 500));
       if (mounted) {
-        showSuccessDialog(ref);
-        clearForm();
+        _showSuccessDialog();
+        _clearForm();
       }
     } else if (mounted) {
-      showSnackBar(
-        reportNotifier.lastError ?? 'فشل إرسال البلاغ', 
-        Theme.of(context).colorScheme.error
-      );
+      _showSnackBar(reportNotifier.lastError ?? 'فشل إرسال البلاغ', true);
     }
   }
 
@@ -1526,7 +1683,7 @@ class _ReportScreenState extends ConsumerState<ReportScreen> with SingleTickerPr
     return regex.hasMatch(url);
   }
 
-  void clearForm() {
+  void _clearForm() {
     _linkController.clear();
     _descriptionController.clear();
     setState(() {
@@ -1535,93 +1692,151 @@ class _ReportScreenState extends ConsumerState<ReportScreen> with SingleTickerPr
     });
   }
 
-  void showSnackBar(String message, Color color) {
+  void _showSnackBar(String message, bool isError) {
+    final theme = Theme.of(context);
+
     ScaffoldMessenger.of(context).clearSnackBars();
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text(message),
-        backgroundColor: color,
+        content: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(4),
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.2),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                isError ? Icons.error_outline_rounded : Icons.check_circle_rounded,
+                color: Colors.white,
+                size: 16,
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(child: Text(message)),
+          ],
+        ),
+        backgroundColor: isError ? Colors.red : Colors.green,
         behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        margin: const EdgeInsets.all(16),
       ),
     );
   }
 
-  void showSuccessDialog(WidgetRef ref) {
+  void _showSuccessDialog() {
     final reportState = ref.read(reportProvider);
     final reports = reportState.value ?? [];
     final lastReport = reports.isNotEmpty ? reports.first : null;
-    
     final trackingNumber = lastReport?.trackingNumber ?? 'جاري إنشاء رقم التتبع';
+    final theme = Theme.of(context);
 
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: Theme.of(context).colorScheme.surface,
-        title: Text(
-          'تم استلام البلاغ',
-          style: TextStyle(
-            color: Theme.of(context).colorScheme.onSurface,
+      builder: (context) => Dialog(
+        backgroundColor: Colors.transparent,
+        child: Container(
+          padding: const EdgeInsets.all(24),
+          decoration: BoxDecoration(
+            color: theme.scaffoldBackgroundColor,
+            borderRadius: BorderRadius.circular(30),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.2),
+                blurRadius: 20,
+                offset: const Offset(0, 10),
+              ),
+            ],
           ),
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                color: Theme.of(context).colorScheme.tertiary.withValues(alpha: 0.1),
-                shape: BoxShape.circle,
-              ),
-              child: Icon(
-                Icons.check_circle,
-                color: Theme.of(context).colorScheme.tertiary,
-                size: 60,
-              ),
-            ),
-            const SizedBox(height: 20),
-            const Text(
-              'شكراً لك على المساهمة في حماية المجتمع',
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 20),
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: Theme.of(context).colorScheme.surfaceContainerHighest,
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Column(
-                children: [
-                  const Text(
-                    'رقم تتبع البلاغ:',
-                    style: TextStyle(fontWeight: FontWeight.bold),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [
+                      Colors.green,
+                      Colors.green.withValues(alpha: 0.8),
+                    ],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
                   ),
-                  const SizedBox(height: 8),
-                  SelectableText(
-                    trackingNumber,
-                    style: TextStyle(
-                      fontSize: 18,
-                      color: Theme.of(context).colorScheme.primary,
-                      fontWeight: FontWeight.bold,
+                  shape: BoxShape.circle,
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.green.withValues(alpha: 0.3),
+                      blurRadius: 15,
+                      offset: const Offset(0, 5),
                     ),
+                  ],
+                ),
+                child: const Icon(
+                  Icons.check_rounded,
+                  color: Colors.white,
+                  size: 40,
+                ),
+              ),
+              const SizedBox(height: 20),
+              const Text(
+                'تم استلام البلاغ',
+                style: TextStyle(
+                  fontSize: 22,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 8),
+              const Text(
+                'شكراً لك على المساهمة في حماية المجتمع',
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 14),
+              ),
+              const SizedBox(height: 20),
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.primary.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: theme.colorScheme.primary.withValues(alpha: 0.2)),
+                ),
+                child: Column(
+                  children: [
+                    const Text(
+                      'رقم تتبع البلاغ:',
+                      style: TextStyle(fontWeight: FontWeight.w500),
+                    ),
+                    const SizedBox(height: 8),
+                    SelectableText(
+                      trackingNumber,
+                      style: TextStyle(
+                        fontSize: 18,
+                        color: theme.colorScheme.primary,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 20),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: () => Navigator.pop(context),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: theme.colorScheme.primary,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    elevation: 4,
                   ),
-                ],
+                  child: const Text('إغلاق'),
+                ),
               ),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text(
-              'إغلاق',
-              style: TextStyle(
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
-              ),
-            ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }

@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'dart:io';
@@ -125,11 +125,14 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
   Widget build(BuildContext context) {
     final authState = ref.watch(authProvider);
     final user = authState.user;
+    final theme = Theme.of(context);
 
     return Scaffold(
       appBar: AppBar(
         title: const Text('تعديل الملف الشخصي'),
         elevation: 0,
+        backgroundColor: theme.colorScheme.primary,
+        foregroundColor: Colors.white,
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
@@ -183,16 +186,44 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                     ),
                     const SizedBox(height: 30),
                     
-                    // حقل الاسم
+                    // ✅ حقل الاسم المحسن
                     TextFormField(
                       controller: _nameController,
                       decoration: InputDecoration(
                         labelText: 'الاسم الكامل',
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(10),
+                        labelStyle: TextStyle(
+                          color: theme.colorScheme.primary,
+                          fontWeight: FontWeight.w500,
                         ),
-                        prefixIcon: const Icon(Icons.person),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide(
+                            color: theme.colorScheme.outline.withValues(alpha: 0.3),
+                          ),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide(
+                            color: theme.colorScheme.outline.withValues(alpha: 0.3),
+                          ),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide(
+                            color: theme.colorScheme.primary,
+                            width: 2,
+                          ),
+                        ),
+                        prefixIcon: Icon(
+                          Icons.person_rounded,
+                          color: theme.colorScheme.primary,
+                        ),
                         hintText: 'أدخل اسمك الكامل',
+                        hintStyle: TextStyle(
+                          color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.5),
+                        ),
+                        filled: true,
+                        fillColor: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
                       ),
                       validator: (value) {
                         if (value == null || value.isEmpty) {
@@ -203,37 +234,95 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                     ),
                     const SizedBox(height: 20),
                     
-                    // البريد الإلكتروني (غير قابل للتعديل)
+                    // ✅ حقل البريد الإلكتروني المحسن (غير قابل للتعديل)
                     TextFormField(
                       initialValue: user?.email,
                       enabled: false,
                       decoration: InputDecoration(
                         labelText: 'البريد الإلكتروني',
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(10),
+                        labelStyle: TextStyle(
+                          color: theme.colorScheme.secondary,
+                          fontWeight: FontWeight.w500,
                         ),
-                        prefixIcon: const Icon(Icons.email),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide(
+                            color: theme.colorScheme.outline.withValues(alpha: 0.2),
+                          ),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide(
+                            color: theme.colorScheme.outline.withValues(alpha: 0.2),
+                          ),
+                        ),
+                        disabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide(
+                            color: theme.colorScheme.outline.withValues(alpha: 0.1),
+                          ),
+                        ),
+                        prefixIcon: Icon(
+                          Icons.email_rounded,
+                          color: theme.colorScheme.secondary.withValues(alpha: 0.7),
+                        ),
+                        filled: true,
+                        fillColor: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.1),
                       ),
                     ),
                     const SizedBox(height: 30),
                     
-                    // زر الحفظ
-                    SizedBox(
+                    // ✅ زر الحفظ المحسن
+                    Container(
                       width: double.infinity,
-                      height: 50,
+                      height: 55,
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [
+                            theme.colorScheme.primary,
+                            theme.colorScheme.primary.withValues(alpha: 0.8),
+                            theme.colorScheme.secondary,
+                          ],
+                          begin: Alignment.centerLeft,
+                          end: Alignment.centerRight,
+                        ),
+                        borderRadius: BorderRadius.circular(16),
+                        boxShadow: [
+                          BoxShadow(
+                            color: theme.colorScheme.primary.withValues(alpha: 0.3),
+                            blurRadius: 10,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
+                      ),
                       child: ElevatedButton(
                         onPressed: _saveProfile,
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.blue,
+                          backgroundColor: Colors.transparent,
                           foregroundColor: Colors.white,
+                          shadowColor: Colors.transparent,
                           shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(10),
+                            borderRadius: BorderRadius.circular(16),
                           ),
-                          elevation: 3,
+                          elevation: 0,
                         ),
-                        child: const Text(
-                          'حفظ التغييرات',
-                          style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                              Icons.save_rounded,
+                              color: Colors.white,
+                              size: 20,
+                            ),
+                            const SizedBox(width: 10),
+                            const Text(
+                              'حفظ التغييرات',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                     ),

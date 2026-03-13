@@ -53,10 +53,11 @@ class DefaultFirebaseOptions {
   }
 
   static const FirebaseOptions android = FirebaseOptions(
-    apiKey: 'AIzaSyC-Bm-nfD8DUvMAIgEUS5dqm86OpwSIMWQ',
-    appId: '1:320639402682:android:a5fb0a60742ee20fe5f883',
-    messagingSenderId: '320639402682',
-    projectId: 'safe-click-88c23',
-    storageBucket: 'safe-click-88c23.firebasestorage.app',
+    apiKey: 'AIzaSyAIpmvwLhYiaWnVWunymZ7dm2Kbh-PlwyY',
+    appId: '1:370263539015:android:9e6506acc4b357eba62062',
+    messagingSenderId: '370263539015',
+    projectId: 'safe-click-7180f',
+    storageBucket: 'safe-click-7180f.firebasestorage.app',
   );
+
 }

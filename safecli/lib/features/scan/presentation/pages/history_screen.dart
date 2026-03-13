@@ -90,13 +90,10 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> with SingleTicker
     if (_lastDeletedScan == null) return;
     
     try {
-      // إعادة الرابط المحذوف إلى التاريخ
       ref.read(scanNotifierProvider.notifier).addScanResult(_lastDeletedScan!);
       
-      // إخفاء أي رسائل سابقة
       ScaffoldMessenger.of(context).clearSnackBars();
       
-      // إظهار رسالة تأكيد التراجع
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Row(
@@ -142,7 +139,6 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> with SingleTicker
         ),
       );
       
-      // مسح الرابط المحفوظ
       _lastDeletedScan = null;
       _undoTimer?.cancel();
       
@@ -169,15 +165,12 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> with SingleTicker
     if (_lastDeletedAllScans == null || _lastDeletedAllScans!.isEmpty) return;
     
     try {
-      // إعادة جميع الروابط المحذوفة
       for (var scan in _lastDeletedAllScans!) {
         ref.read(scanNotifierProvider.notifier).addScanResult(scan);
       }
       
-      // إخفاء أي رسائل سابقة
       ScaffoldMessenger.of(context).clearSnackBars();
       
-      // إظهار رسالة تأكيد التراجع
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Row(
@@ -219,7 +212,6 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> with SingleTicker
         ),
       );
       
-      // مسح القائمة المحفوظة
       _lastDeletedAllScans = null;
       _undoAllTimer?.cancel();
       
@@ -258,122 +250,53 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> with SingleTicker
             onRefresh: () async {
               await ref.read(scanNotifierProvider.notifier).refreshHistory();
             },
-            child: Column(
-              children: [
-                // رأس مخصص مع البحث
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(20, 20, 20, 10),
-                  child: _isSearching 
-                      ? _buildSearchBar(theme)
-                      : _buildHeader(theme, scanHistory),
+            color: theme.colorScheme.primary,
+            backgroundColor: theme.colorScheme.surface,
+            child: CustomScrollView(
+              physics: const AlwaysScrollableScrollPhysics(),
+              slivers: [
+                // ✅ Sliver للرأس مع تأثيرات
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(20, 20, 20, 10),
+                    child: _isSearching 
+                        ? _buildSearchBar(theme)
+                        : _buildHeader(theme, scanHistory),
+                  ),
                 ),
 
-                // تبويبات أنيقة
+                // ✅ Sliver للتبويبات
                 if (!_isSearching)
-                  Container(
-                    margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-                    padding: const EdgeInsets.all(6),
-                    decoration: BoxDecoration(
-                      color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
-                      borderRadius: BorderRadius.circular(100),
-                    ),
-                    child: Row(
-                      children: [
-                        _buildTabItem(
-                          index: 0,
-                          selectedIndex: selectedIndex,
-                          icon: Icons.list_alt_rounded,
-                          label: 'الكل',
-                          count: scanHistory.length,
-                          color: theme.colorScheme.primary,
-                        ),
-                        _buildTabItem(
-                          index: 1,
-                          selectedIndex: selectedIndex,
-                          icon: Icons.check_circle_rounded,
-                          label: 'آمن',
-                          count: scanHistory.where((s) => s.safe == true).length,
-                          color: theme.colorScheme.tertiary,
-                        ),
-                        _buildTabItem(
-                          index: 2,
-                          selectedIndex: selectedIndex,
-                          icon: Icons.warning_amber_rounded,
-                          label: 'مشبوه',
-                          count: scanHistory.where((s) => s.safe == null).length,
-                          color: theme.colorScheme.secondary,
-                        ),
-                        _buildTabItem(
-                          index: 3,
-                          selectedIndex: selectedIndex,
-                          icon: Icons.dangerous_rounded,
-                          label: 'خطر',
-                          count: scanHistory.where((s) => s.safe == false).length,
-                          color: theme.colorScheme.error,
-                        ),
-                      ],
+                  SliverToBoxAdapter(
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                      child: _buildTabs(theme, scanHistory, selectedIndex),
                     ),
                   ),
 
-                // عرض عدد نتائج البحث
+                // ✅ عرض نتائج البحث
                 if (_isSearching && searchQuery.isNotEmpty)
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-                    child: Row(
-                      children: [
-                        Text(
-                          '🔍 نتائج البحث: ',
-                          style: theme.textTheme.labelLarge,
-                        ),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                          decoration: BoxDecoration(
-                            color: theme.colorScheme.primary.withValues(alpha: 0.1),
-                            borderRadius: BorderRadius.circular(100),
-                          ),
-                          child: Text(
-                            '${filteredHistory.length}',
-                            style: theme.textTheme.labelLarge?.copyWith(
-                              color: theme.colorScheme.primary,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ),
-                        const Spacer(),
-                        if (filteredHistory.isEmpty && searchQuery.isNotEmpty)
-                          TextButton.icon(
-                            onPressed: _stopSearch,
-                            icon: const Icon(Icons.close, size: 16),
-                            label: const Text('إلغاء البحث'),
-                            style: TextButton.styleFrom(
-                              foregroundColor: theme.colorScheme.error,
-                            ),
-                          ),
-                      ],
-                    ),
+                  SliverToBoxAdapter(
+                    child: _buildSearchResultsHeader(theme, filteredHistory, searchQuery),
                   ),
 
-                // المحتوى الرئيسي
-                Expanded(
-                  child: filteredHistory.isEmpty
-                      ? SingleChildScrollView(
-                          physics: const AlwaysScrollableScrollPhysics(),
-                          child: Container(
-                            height: MediaQuery.of(context).size.height * 0.6,
-                            alignment: Alignment.center,
-                            child: _buildEmptyState(theme, selectedIndex, searchQuery),
+                // ✅ المحتوى الرئيسي
+                filteredHistory.isEmpty
+                    ? SliverFillRemaining(
+                        child: _buildEmptyState(theme, selectedIndex, searchQuery),
+                      )
+                    : SliverPadding(
+                        padding: const EdgeInsets.all(20),
+                        sliver: SliverList(
+                          delegate: SliverChildBuilderDelegate(
+                            (context, index) {
+                              final scan = filteredHistory[index];
+                              return _buildHistoryCard(context, scan, ref);
+                            },
+                            childCount: filteredHistory.length,
                           ),
-                        )
-                      : ListView.builder(
-                          physics: const AlwaysScrollableScrollPhysics(),
-                          padding: const EdgeInsets.all(20),
-                          itemCount: filteredHistory.length,
-                          itemBuilder: (context, index) {
-                            final scan = filteredHistory[index];
-                            return _buildHistoryCard(context, scan, ref);
-                          },
                         ),
-                ),
+                      ),
               ],
             ),
           ),
@@ -382,190 +305,61 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> with SingleTicker
     );
   }
 
-  Widget _buildHeader(ThemeData theme, List<ScanResult> scanHistory) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [
-                    theme.colorScheme.primary.withValues(alpha: 0.1),
-                    theme.colorScheme.tertiary.withValues(alpha: 0.1),
-                  ],
-                ),
-                borderRadius: BorderRadius.circular(16),
-              ),
-              child: Icon(
-                Icons.history_rounded,
-                color: theme.colorScheme.primary,
-                size: 28,
-              ),
-            ),
-            const SizedBox(width: 12),
-            Text(
-              'سجل الفحوصات',
-              style: theme.textTheme.titleLarge?.copyWith(
-                fontWeight: FontWeight.bold,
-                color: theme.colorScheme.onSurface,
-              ),
-            ),
-          ],
-        ),
-        Row(
-          children: [
-            if (scanHistory.isNotEmpty)
-              Container(
-                margin: const EdgeInsets.only(right: 8),
-                decoration: BoxDecoration(
-                  color: theme.colorScheme.primary.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: IconButton(
-                  icon: Icon(Icons.search_rounded, color: theme.colorScheme.primary, size: 22),
-                  onPressed: _startSearch,
-                  tooltip: 'بحث',
-                ),
-              ),
-            if (scanHistory.isNotEmpty)
-              Container(
-                decoration: BoxDecoration(
-                  color: theme.colorScheme.error.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: IconButton(
-                  icon: Icon(Icons.delete_sweep_rounded, color: theme.colorScheme.error, size: 22),
-                  onPressed: () => _confirmClearHistory(context, ref),
-                  tooltip: 'مسح الكل',
-                ),
-              ),
-          ],
-        ),
-      ],
-    );
-  }
-
-  Widget _buildSearchBar(ThemeData theme) {
+  // ✅ تبويبات محسنة
+  Widget _buildTabs(ThemeData theme, List<ScanResult> scanHistory, int selectedIndex) {
     return Container(
-      height: 56,
+      padding: const EdgeInsets.all(6),
       decoration: BoxDecoration(
         color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: theme.colorScheme.primary.withValues(alpha: 0.3)),
+        borderRadius: BorderRadius.circular(100),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 2),
+          ),
+        ],
       ),
       child: Row(
         children: [
-          Expanded(
-            child: TextField(
-              controller: _searchController,
-              autofocus: true,
-              textDirection: TextDirection.rtl,
-              decoration: InputDecoration(
-                hintText: '🔍 ابحث عن رابط...',
-                hintStyle: TextStyle(
-                  color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.5),
-                ),
-                border: InputBorder.none,
-                contentPadding: const EdgeInsets.symmetric(horizontal: 16),
-                suffixIcon: IconButton(
-                  icon: Icon(Icons.close, color: theme.colorScheme.onSurfaceVariant),
-                  onPressed: _stopSearch,
-                ),
-              ),
-              onChanged: _updateSearch,
-            ),
+          _buildTabItem(
+            index: 0,
+            selectedIndex: selectedIndex,
+            icon: Icons.list_alt_rounded,
+            label: 'الكل',
+            count: scanHistory.length,
+            color: theme.colorScheme.primary,
+          ),
+          _buildTabItem(
+            index: 1,
+            selectedIndex: selectedIndex,
+            icon: Icons.check_circle_rounded,
+            label: 'آمن',
+            count: scanHistory.where((s) => s.safe == true).length,
+            color: theme.colorScheme.tertiary,
+          ),
+          _buildTabItem(
+            index: 2,
+            selectedIndex: selectedIndex,
+            icon: Icons.warning_amber_rounded,
+            label: 'مشبوه',
+            count: scanHistory.where((s) => s.safe == null).length,
+            color: theme.colorScheme.secondary,
+          ),
+          _buildTabItem(
+            index: 3,
+            selectedIndex: selectedIndex,
+            icon: Icons.dangerous_rounded,
+            label: 'خطر',
+            count: scanHistory.where((s) => s.safe == false).length,
+            color: theme.colorScheme.error,
           ),
         ],
       ),
     );
   }
 
-  Widget _buildEmptyState(ThemeData theme, int selectedIndex, String searchQuery) {
-    if (_isSearching && searchQuery.isNotEmpty) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(30),
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: theme.colorScheme.primary.withValues(alpha: 0.1),
-              ),
-              child: Icon(
-                Icons.search_off_rounded,
-                size: 60,
-                color: theme.colorScheme.primary.withValues(alpha: 0.5),
-              ),
-            ),
-            const SizedBox(height: 24),
-            Text(
-              'لا توجد نتائج للبحث',
-              style: theme.textTheme.titleMedium?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant,
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'حاول استخدام كلمات بحث مختلفة',
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.7),
-              ),
-            ),
-            const SizedBox(height: 16),
-            ElevatedButton.icon(
-              onPressed: _stopSearch,
-              icon: const Icon(Icons.arrow_back),
-              label: const Text('العودة للسجل'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: theme.colorScheme.primary,
-                foregroundColor: theme.colorScheme.onPrimary,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(100)),
-              ),
-            ),
-          ],
-        ),
-      );
-    }
-
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Container(
-            padding: const EdgeInsets.all(30),
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: _getEmptyIconColor(theme, selectedIndex).withValues(alpha: 0.1),
-            ),
-            child: Icon(
-              _getEmptyIcon(selectedIndex),
-              size: 60,
-              color: _getEmptyIconColor(theme, selectedIndex).withValues(alpha: 0.5),
-            ),
-          ),
-          const SizedBox(height: 24),
-          Text(
-            _getEmptyMessage(selectedIndex),
-            style: theme.textTheme.titleMedium?.copyWith(
-              color: theme.colorScheme.onSurfaceVariant,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            _getEmptySubMessage(selectedIndex),
-            style: theme.textTheme.bodySmall?.copyWith(
-              color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.7),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
+  // ✅ عنصر التبويب
   Widget _buildTabItem({
     required int index,
     required int selectedIndex,
@@ -587,6 +381,13 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> with SingleTicker
           decoration: BoxDecoration(
             color: isSelected ? color : Colors.transparent,
             borderRadius: BorderRadius.circular(100),
+            boxShadow: isSelected ? [
+              BoxShadow(
+                color: color.withValues(alpha: 0.3),
+                blurRadius: 8,
+                offset: const Offset(0, 2),
+              ),
+            ] : null,
           ),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
@@ -633,6 +434,292 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> with SingleTicker
     );
   }
 
+  // ✅ رأس محسن
+  Widget _buildHeader(ThemeData theme, List<ScanResult> scanHistory) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [
+                    theme.colorScheme.primary.withValues(alpha: 0.1),
+                    theme.colorScheme.tertiary.withValues(alpha: 0.1),
+                  ],
+                ),
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: Icon(
+                Icons.history_rounded,
+                color: theme.colorScheme.primary,
+                size: 28,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'سجل الفحوصات',
+                  style: theme.textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.bold,
+                    color: theme.colorScheme.onSurface,
+                  ),
+                ),
+                Text(
+                  '${scanHistory.length} فحص',
+                  style: theme.textTheme.labelMedium?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+        Row(
+          children: [
+            if (scanHistory.isNotEmpty)
+              _buildIconButton(
+                icon: Icons.search_rounded,
+                color: theme.colorScheme.primary,
+                onPressed: _startSearch,
+                tooltip: 'بحث',
+              ),
+            if (scanHistory.isNotEmpty)
+              const SizedBox(width: 8),
+            if (scanHistory.isNotEmpty)
+              _buildIconButton(
+                icon: Icons.delete_sweep_rounded,
+                color: theme.colorScheme.error,
+                onPressed: () => _confirmClearHistory(context, ref),
+                tooltip: 'مسح الكل',
+              ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  // ✅ زر أيقونة محسن
+  Widget _buildIconButton({
+    required IconData icon,
+    required Color color,
+    required VoidCallback onPressed,
+    required String tooltip,
+  }) {
+    return Container(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [
+            color.withValues(alpha: 0.1),
+            color.withValues(alpha: 0.05),
+          ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: color.withValues(alpha: 0.2),
+          width: 1,
+        ),
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onPressed,
+          borderRadius: BorderRadius.circular(12),
+          child: Container(
+            padding: const EdgeInsets.all(10),
+            child: Icon(
+              icon,
+              color: color,
+              size: 22,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  // ✅ شريط بحث محسن
+  Widget _buildSearchBar(ThemeData theme) {
+    return Container(
+      height: 56,
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [
+            theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.8),
+            theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+          ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: theme.colorScheme.primary.withValues(alpha: 0.3),
+          width: 1.5,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: theme.colorScheme.primary.withValues(alpha: 0.1),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: TextField(
+              controller: _searchController,
+              autofocus: true,
+              textDirection: TextDirection.rtl,
+              decoration: InputDecoration(
+                hintText: '🔍 ابحث عن رابط...',
+                hintStyle: TextStyle(
+                  color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.5),
+                ),
+                border: InputBorder.none,
+                contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+                prefixIcon: Icon(
+                  Icons.search_rounded,
+                  color: theme.colorScheme.primary,
+                  size: 22,
+                ),
+                suffixIcon: _buildSearchCloseButton(theme),
+              ),
+              onChanged: _updateSearch,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ✅ زر إغلاق البحث
+  Widget _buildSearchCloseButton(ThemeData theme) {
+    return Container(
+      margin: const EdgeInsets.all(8),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.1),
+        shape: BoxShape.circle,
+      ),
+      child: IconButton(
+        icon: Icon(
+          Icons.close_rounded,
+          color: theme.colorScheme.onSurfaceVariant,
+          size: 18,
+        ),
+        onPressed: _stopSearch,
+        padding: EdgeInsets.zero,
+        constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+      ),
+    );
+  }
+
+  // ✅ رأس نتائج البحث المحسن
+  Widget _buildSearchResultsHeader(ThemeData theme, List<ScanResult> filteredHistory, String searchQuery) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(6),
+            decoration: BoxDecoration(
+              color: theme.colorScheme.primary.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: const Icon(Icons.search_rounded, size: 16, color: Color(0xFF667EEA)),
+          ),
+          const SizedBox(width: 8),
+          Text(
+            'نتائج البحث: ',
+            style: theme.textTheme.labelLarge?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+          ),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+            decoration: BoxDecoration(
+              color: theme.colorScheme.primary.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(100),
+            ),
+            child: Text(
+              '${filteredHistory.length}',
+              style: theme.textTheme.labelLarge?.copyWith(
+                color: theme.colorScheme.primary,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+          const Spacer(),
+          if (filteredHistory.isEmpty && searchQuery.isNotEmpty)
+            _buildCancelSearchButton(theme),
+        ],
+      ),
+    );
+  }
+
+  // ✅ زر إلغاء البحث المحسن
+  Widget _buildCancelSearchButton(ThemeData theme) {
+    return Container(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [
+            theme.colorScheme.error.withValues(alpha: 0.1),
+            theme.colorScheme.error.withValues(alpha: 0.05),
+          ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(30),
+        border: Border.all(
+          color: theme.colorScheme.error.withValues(alpha: 0.3),
+          width: 1,
+        ),
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: _stopSearch,
+          borderRadius: BorderRadius.circular(30),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(2),
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.error.withValues(alpha: 0.2),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(
+                    Icons.close_rounded,
+                    size: 14,
+                    color: theme.colorScheme.error,
+                  ),
+                ),
+                const SizedBox(width: 6),
+                Text(
+                  'إلغاء البحث',
+                  style: theme.textTheme.labelMedium?.copyWith(
+                    color: theme.colorScheme.error,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  // ✅ بطاقة التاريخ المحسنة
   Widget _buildHistoryCard(BuildContext context, ScanResult scan, WidgetRef ref) {
     final isSafe = scan.safe;
     final theme = Theme.of(context);
@@ -648,6 +735,13 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> with SingleTicker
         color: theme.cardTheme.color,
         borderRadius: BorderRadius.circular(20),
         border: Border.all(color: statusColor.withValues(alpha: 0.2), width: 1),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.03),
+            blurRadius: 10,
+            offset: const Offset(0, 2),
+          ),
+        ],
       ),
       child: Material(
         color: Colors.transparent,
@@ -698,7 +792,10 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> with SingleTicker
                         scan.link,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600),
+                        style: theme.textTheme.titleSmall?.copyWith(
+                          fontWeight: FontWeight.w600,
+                          color: theme.colorScheme.onSurface,
+                        ),
                       ),
                       const SizedBox(height: 6),
                       Row(
@@ -747,11 +844,20 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> with SingleTicker
                     color: theme.colorScheme.error.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(12),
                   ),
-                  child: IconButton(
-                    icon: Icon(Icons.close_rounded, size: 18, color: theme.colorScheme.error),
-                    onPressed: () => _confirmDeleteScan(context, scan, ref),
-                    constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
-                    padding: EdgeInsets.zero,
+                  child: Material(
+                    color: Colors.transparent,
+                    child: InkWell(
+                      onTap: () => _confirmDeleteScan(context, scan, ref),
+                      borderRadius: BorderRadius.circular(12),
+                      child: Container(
+                        padding: const EdgeInsets.all(8),
+                        child: Icon(
+                          Icons.close_rounded,
+                          size: 18,
+                          color: theme.colorScheme.error,
+                        ),
+                      ),
+                    ),
                   ),
                 ),
               ],
@@ -762,6 +868,7 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> with SingleTicker
     );
   }
 
+  // ✅ باقي الدوال كما هي (لم يتم تغييرها)
   String _formatDate(DateTime date) {
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
@@ -816,6 +923,80 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> with SingleTicker
     }
   }
 
+  Widget _buildEmptyState(ThemeData theme, int selectedIndex, String searchQuery) {
+    if (_isSearching && searchQuery.isNotEmpty) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(30),
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: theme.colorScheme.primary.withValues(alpha: 0.1),
+              ),
+              child: Icon(
+                Icons.search_off_rounded,
+                size: 60,
+                color: theme.colorScheme.primary.withValues(alpha: 0.5),
+              ),
+            ),
+            const SizedBox(height: 24),
+            Text(
+              'لا توجد نتائج للبحث',
+              style: theme.textTheme.titleMedium?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'حاول استخدام كلمات بحث مختلفة',
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.7),
+              ),
+            ),
+            const SizedBox(height: 16),
+            _buildCancelSearchButton(theme),
+          ],
+        ),
+      );
+    }
+
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(30),
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: _getEmptyIconColor(theme, selectedIndex).withValues(alpha: 0.1),
+            ),
+            child: Icon(
+              _getEmptyIcon(selectedIndex),
+              size: 60,
+              color: _getEmptyIconColor(theme, selectedIndex).withValues(alpha: 0.5),
+            ),
+          ),
+          const SizedBox(height: 24),
+          Text(
+            _getEmptyMessage(selectedIndex),
+            style: theme.textTheme.titleMedium?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            _getEmptySubMessage(selectedIndex),
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.7),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Future<void> _confirmDeleteScan(BuildContext context, ScanResult scan, WidgetRef ref) async {
     final shouldDelete = await showDialog<bool>(
       context: context,
@@ -848,13 +1029,8 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> with SingleTicker
 
     if (shouldDelete == true) {
       try {
-        // إلغاء أي تايمر سابق
         _undoTimer?.cancel();
-        
-        // حفظ الرابط المحذوف قبل الحذف للتراجع
         _lastDeletedScan = scan;
-        
-        // حذف الرابط
         await ref.read(scanNotifierProvider.notifier).softDeleteScanResult(scan.id);
         
         if (!context.mounted) return;
@@ -863,10 +1039,7 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> with SingleTicker
             ? '${scan.link.substring(0, 30)}...' 
             : scan.link;
         
-        // مسح أي رسائل سابقة قبل إظهار الرسالة الجديدة
         ScaffoldMessenger.of(context).clearSnackBars();
-        
-        // إظهار رسالة نجاح الحذف مع زر التراجع (تظهر لمدة 5 ثواني ثم تختفي)
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Row(
@@ -912,7 +1085,7 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> with SingleTicker
             ),
             backgroundColor: Colors.green,
             behavior: SnackBarBehavior.floating,
-            duration: const Duration(seconds: 5), // 👈 5 ثواني بالضبط ثم تختفي تلقائياً
+            duration: const Duration(seconds: 5),
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
             action: SnackBarAction(
               label: 'تراجع',
@@ -922,7 +1095,6 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> with SingleTicker
           ),
         );
         
-        // تايمر لمسح الرابط المحفوظ بعد انتهاء مدة التراجع (5 ثواني)
         _undoTimer = Timer(const Duration(seconds: 5), () {
           if (mounted) {
             setState(() {
@@ -1016,22 +1188,14 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> with SingleTicker
 
     if (shouldClear == true) {
       try {
-        // إلغاء أي تايمر سابق
         _undoAllTimer?.cancel();
-        
-        // حفظ جميع الفحوصات قبل الحذف للتراجع
         _lastDeletedAllScans = List.from(scanHistory);
-        
-        // حذف جميع الفحوصات
         await ref.read(scanNotifierProvider.notifier).clearUserHistory();
         _stopSearch();
         
         if (!context.mounted) return;
         
-        // مسح أي رسائل سابقة قبل إظهار الرسالة الجديدة
         ScaffoldMessenger.of(context).clearSnackBars();
-        
-        // إظهار رسالة نجاح مسح الكل مع زر التراجع (تظهر لمدة 5 ثواني ثم تختفي)
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Row(
@@ -1042,7 +1206,7 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> with SingleTicker
                     color: Colors.white.withValues(alpha: 0.2),
                     shape: BoxShape.circle,
                   ),
-                  child: const Icon(Icons.delete_sweep, color: Colors.white, size: 16),
+                  child: const Icon(Icons.delete_sweep, color: Colors.white, size: 16),  
                 ),
                 const SizedBox(width: 12),
                 Expanded(
@@ -1075,17 +1239,16 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> with SingleTicker
             ),
             backgroundColor: Colors.orange,
             behavior: SnackBarBehavior.floating,
-            duration: const Duration(seconds: 5), // 👈 5 ثواني بالضبط ثم تختفي تلقائياً
+            duration: const Duration(seconds: 5),
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
             action: SnackBarAction(
               label: 'تراجع',
               textColor: Colors.white,
-              onPressed: _undoDeleteAll, // 👈 دالة التراجع عن حذف الكل
+              onPressed: _undoDeleteAll,
             ),
           ),
         );
         
-        // تايمر لمسح القائمة المحفوظة بعد انتهاء مدة التراجع (5 ثواني)
         _undoAllTimer = Timer(const Duration(seconds: 5), () {
           if (mounted) {
             setState(() {

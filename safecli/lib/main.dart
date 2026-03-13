@@ -85,12 +85,24 @@ class _MyAppState extends ConsumerState<MyApp> {
   
   // للإشعارات
   StreamSubscription<RemoteMessage>? _notificationSubscription;
+  
+  // ✅ متغير للتحكم في مدة ظهور Splash Screen (5 ثواني)
+  bool _showSplash = true;
 
   @override
   void initState() {
     super.initState();
     _initDeepLinks();
     _listenToNotifications();
+    
+    // ✅ تأخير 5 ثواني ثم إخفاء الـ Splash
+    Future.delayed(const Duration(seconds: 5), () {
+      if (mounted) {
+        setState(() {
+          _showSplash = false;
+        });
+      }
+    });
   }
 
   // ✅ الاستماع للإشعارات الواردة
@@ -216,8 +228,18 @@ class _MyAppState extends ConsumerState<MyApp> {
         builder: (context, ref, child) {
           final authState = ref.watch(authProvider);
 
-          if (authState.isInitializing) {
+          // ✅ 1. أولاً: أظهر الـ Splash للمدة المحددة (5 ثواني)
+          if (_showSplash) {
             return const SplashScreen();
+          }
+
+          // ✅ 2. إذا كانت تهيئة Firebase لا تزال جارية بعد الـ Splash
+          if (authState.isInitializing) {
+            return const Scaffold(
+              body: Center(
+                child: CircularProgressIndicator(),
+              ),
+            );
           }
 
           // معالجة الرابط المعلق إذا كان المستخدم مسجل دخول

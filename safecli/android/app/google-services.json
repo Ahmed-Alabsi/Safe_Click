@@ -1,13 +1,13 @@
 {
   "project_info": {
-    "project_number": "320639402682",
-    "project_id": "safe-click-88c23",
-    "storage_bucket": "safe-click-88c23.firebasestorage.app"
+    "project_number": "370263539015",
+    "project_id": "safe-click-7180f",
+    "storage_bucket": "safe-click-7180f.firebasestorage.app"
   },
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:320639402682:android:a5fb0a60742ee20fe5f883",
+        "mobilesdk_app_id": "1:370263539015:android:9e6506acc4b357eba62062",
         "android_client_info": {
           "package_name": "com.example.safecli"
         }
@@ -15,7 +15,7 @@
       "oauth_client": [],
       "api_key": [
         {
-          "current_key": "AIzaSyC-Bm-nfD8DUvMAIgEUS5dqm86OpwSIMWQ"
+          "current_key": "AIzaSyAIpmvwLhYiaWnVWunymZ7dm2Kbh-PlwyY"
         }
       ],
       "services": {

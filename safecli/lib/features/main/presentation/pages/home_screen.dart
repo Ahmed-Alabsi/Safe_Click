@@ -14,21 +14,21 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  int _currentIndex = 0;
-  final List<Widget> _screens = [
-    const MainScreen(),
-    const HistoryScreen(),
-    const ReportScreen(),
-    const ProfileScreen(),
-    const SettingsScreen(),
+  int _currentIndex = 2; // نبدأ من الصفحة الرئيسية (الوسط)
+  final List<Widget> _screens = const [
+    SettingsScreen(), // 0 - اليمين (سيتم إعادة الترتيب)
+    ProfileScreen(),  // 1
+    MainScreen(),     // 2 - المنتصف (الرئيسية)
+    HistoryScreen(),  // 3
+    ReportScreen(),   // 4 - اليسار
   ];
 
   final List<String> _titles = [
+    'الإعدادات',
+    'الملف الشخصي',
     'الرئيسية',
     'السجل',
     'الإبلاغ',
-    'الملف الشخصي',
-    'الإعدادات',
   ];
 
   @override
@@ -48,19 +48,18 @@ class _HomeScreenState extends State<HomeScreen> {
           centerTitle: true,
           actions: _buildAppBarActions(),
         ),
-        // Phase 3: IndexedStack keeps all screens alive — no rebuild on tab switch.
         body: IndexedStack(
           index: _currentIndex,
           children: _screens,
         ),
-        bottomNavigationBar: _buildBottomNavigationBar(),
+        bottomNavigationBar: _buildBeautifulCenterNavigationBar(),
       ),
     );
   }
 
   List<Widget> _buildAppBarActions() {
     return [
-      if (_currentIndex == 0)
+      if (_currentIndex == 2) // إذا كنا في الصفحة الرئيسية
         IconButton(
           icon: const Icon(Icons.qr_code_scanner),
           onPressed: _showScanOptions,
@@ -69,63 +68,159 @@ class _HomeScreenState extends State<HomeScreen> {
     ];
   }
 
-  Widget _buildBottomNavigationBar() {
+  // ✅ شريط تنقل بوسط بارز وتصميم أنيق
+  Widget _buildBeautifulCenterNavigationBar() {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
     return Container(
+      height: 70, // تصغير ارتفاع الشريط
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       decoration: BoxDecoration(
+        color: colorScheme.surface,
+        borderRadius: BorderRadius.circular(30),
         boxShadow: [
           BoxShadow(
-            color: Theme.of(context).shadowColor,
-            blurRadius: 10,
-            offset: const Offset(0, -5),
+            color: Colors.black.withValues(alpha: 0.1),
+            blurRadius: 20,
+            offset: const Offset(0, 5),
+            spreadRadius: 0,
           ),
         ],
       ),
-      child: BottomNavigationBar(
-        currentIndex: _currentIndex,
-        onTap: (index) {
-          setState(() {
-            _currentIndex = index;
-          });
-        },
-        type: BottomNavigationBarType.fixed,
-        selectedItemColor: Theme.of(context).colorScheme.primary,
-        unselectedItemColor: Theme.of(context).colorScheme.onSurfaceVariant,
-        selectedLabelStyle: const TextStyle(fontWeight: FontWeight.bold),
-        items: const [
-          BottomNavigationBarItem(
-            icon: Icon(Icons.home_outlined),
-            activeIcon: Icon(Icons.home),
-            label: 'الرئيسية',
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+        children: [
+          // الجهة اليسرى (إعدادات + ملف شخصي)
+          Expanded(
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              children: [
+                _buildNavItem(
+                  icon: Icons.settings_outlined,
+                  activeIcon: Icons.settings_rounded,
+                  label: 'الإعدادات',
+                  index: 0,
+                ),
+                _buildNavItem(
+                  icon: Icons.person_outlined,
+                  activeIcon: Icons.person_rounded,
+                  label: 'الملف',
+                  index: 1,
+                ),
+              ],
+            ),
           ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.history_outlined),
-            activeIcon: Icon(Icons.history),
-            label: 'السجل',
+
+          // زر الرئيسية في المنتصف (بارز)
+          GestureDetector(
+            onTap: () => setState(() => _currentIndex = 2),
+            child: Container(
+              width: 50,
+              height: 50,
+              margin: const EdgeInsets.only(bottom: 10), // يظهر للأعلى
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [
+                    colorScheme.primary,
+                    colorScheme.primary.withValues(alpha: 0.8),
+                  ],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                shape: BoxShape.circle,
+                boxShadow: [
+                  BoxShadow(
+                    color: colorScheme.primary.withValues(alpha: 0.3),
+                    blurRadius: 15,
+                    offset: const Offset(0, 5),
+                    spreadRadius: 0,
+                  ),
+                ],
+              ),
+              child: Icon(
+                _currentIndex == 2 ? Icons.home_rounded : Icons.home_outlined,
+                color: Colors.white,
+                size: 30,
+              ),
+            ),
           ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.report_outlined),
-            activeIcon: Icon(Icons.report),
-            label: 'الإبلاغ',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.person_outlined),
-            activeIcon: Icon(Icons.person),
-            label: 'الملف',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.settings_outlined),
-            activeIcon: Icon(Icons.settings),
-            label: 'الإعدادات',
+
+          // الجهة اليمنى (سجل + إبلاغ)
+          Expanded(
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              children: [
+                _buildNavItem(
+                  icon: Icons.history_outlined,
+                  activeIcon: Icons.history_rounded,
+                  label: 'السجل',
+                  index: 3,
+                ),
+                _buildNavItem(
+                  icon: Icons.report_outlined,
+                  activeIcon: Icons.report,
+                  label: 'الإبلاغ',
+                  index: 4,
+                ),
+              ],
+            ),
           ),
         ],
       ),
     );
   }
 
+  // ✅ عنصر تنقل جانبي
+  Widget _buildNavItem({
+    required IconData icon,
+    required IconData activeIcon,
+    required String label,
+    required int index,
+  }) {
+    final isSelected = _currentIndex == index;
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
+    return InkWell(
+      onTap: () => setState(() => _currentIndex = index),
+      borderRadius: BorderRadius.circular(15),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        decoration: BoxDecoration(
+          color: isSelected 
+              ? colorScheme.primary.withValues(alpha: 0.1)
+              : Colors.transparent,
+          borderRadius: BorderRadius.circular(15),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              isSelected ? activeIcon : icon,
+              color: isSelected ? colorScheme.primary : colorScheme.onSurfaceVariant,
+              size: 22,
+            ),
+            const SizedBox(height: 2),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 10,
+                fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
+                color: isSelected ? colorScheme.primary : colorScheme.onSurfaceVariant,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Future<bool> _onWillPop() async {
-    if (_currentIndex != 0) {
+    if (_currentIndex != 2) { // إذا لم نكن في الصفحة الرئيسية
       setState(() {
-        _currentIndex = 0;
+        _currentIndex = 2; // نعود للصفحة الرئيسية
       });
       return false;
     }
@@ -207,7 +302,6 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   void _showQRScanner() {
-    // يمكن إضافة مكتبة لمسح QR Code
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
         content: Text('سيتم إضافة ميزة مسح QR Code قريباً'),
