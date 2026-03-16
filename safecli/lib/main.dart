@@ -8,7 +8,7 @@ import 'dart:async';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'firebase_options.dart'; 
-
+import 'package:safeclik/features/auth/presentation/pages/welcome_screen.dart';
 import 'package:safeclik/core/di/di.dart';
 import 'package:safeclik/core/utils/notification_service.dart';
 import 'package:safeclik/core/theme/app_theme.dart';
@@ -29,6 +29,7 @@ import 'package:safeclik/features/profile/presentation/pages/edit_profile_screen
 import 'package:safeclik/features/report/presentation/pages/report_screen.dart';
 import 'package:safeclik/features/settings/presentation/pages/settings_screen.dart';
 import 'package:safeclik/features/auth/presentation/pages/forgot_password_screen.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 // ✅ دالة معالجة الإشعارات في الخلفية (يجب أن تكون في أعلى مستوى)
 @pragma('vm:entry-point')
@@ -66,8 +67,47 @@ Future<void> main() async {
   // 6. تهيئة NotificationService (هذا سيقوم بكل شيء)
   await sl<NotificationService>().initialize();
 
-  // 7. تشغيل التطبيق
+  // ✅ 7. التحقق من حالة الإشعارات والروابط العميقة المحفوظة وتطبيقها
+  await _setupNotificationAndDeepLinksSettings();
+
+  // 8. تشغيل التطبيق
   runApp(const ProviderScope(child: MyApp()));
+}
+
+// ✅ دالة محدثة لإعداد الإشعارات والروابط العميقة حسب الإعدادات المحفوظة
+Future<void> _setupNotificationAndDeepLinksSettings() async {
+  try {
+    final prefs = await SharedPreferences.getInstance();
+    final notificationsEnabled = prefs.getBool('notifications') ?? true;
+    final autoScanEnabled = prefs.getBool('autoScan') ?? true;
+    // ✅ deepLinks مرتبط بـ autoScan وليس notifications
+    final deepLinksEnabled = prefs.getBool('deepLinks') ?? autoScanEnabled;
+    
+    final notificationService = sl<NotificationService>();
+    
+    // إعداد الإشعارات
+    if (notificationsEnabled) {
+      // إذا كانت الإشعارات مفعلة في الإعدادات، اشترك في المواضيع
+      await notificationService.subscribeToTopic('all_users');
+      await notificationService.subscribeToTopic('security_alerts');
+      print('✅ تم الاشتراك في الإشعارات حسب الإعدادات');
+    } else {
+      // إذا كانت الإشعارات معطلة، تأكد من إلغاء الاشتراك
+      await notificationService.unsubscribeFromTopic('all_users');
+      await notificationService.unsubscribeFromTopic('security_alerts');
+      print('🔕 الإشعارات معطلة حسب الإعدادات');
+    }
+    
+    // ✅ إعداد الروابط العميقة (مرتبطة بـ autoScan)
+    if (deepLinksEnabled) {
+      print('🔗 الروابط العميقة مفعلة (مرتبطة بالفحص التلقائي)');
+    } else {
+      print('🔗 الروابط العميقة معطلة (الفحص التلقائي معطل)');
+    }
+    
+  } catch (e) {
+    print('❌ خطأ في إعداد الإعدادات: $e');
+  }
 }
 
 class MyApp extends ConsumerStatefulWidget {
@@ -110,8 +150,12 @@ class _MyAppState extends ConsumerState<MyApp> {
     _notificationSubscription = sl<NotificationService>().onFirebaseMessageReceived.listen((message) {
       debugPrint('📱 تم استقبال إشعار عبر الـ Stream');
       
-      // هنا يمكنك تحديث الـ UI أو توجيه المستخدم
-      _handleNotificationNavigation(message);
+      // التحقق من حالة الإشعارات في الإعدادات قبل عرض الإشعار
+      final settings = ref.read(settingsProvider).value;
+      if (settings?.notifications ?? true) {
+        // فقط إذا كانت الإشعارات مفعلة نقوم بمعالجتها
+        _handleNotificationNavigation(message);
+      }
     });
   }
 
@@ -126,11 +170,14 @@ class _MyAppState extends ConsumerState<MyApp> {
       debugPrint('📱 التوجه للشاشة: $screen بالمعرف: $id');
       
       // هنا يمكنك توجيه المستخدم للشاشة المناسبة
-      // مثلاً إذا كان الإشعار يريد فتح شاشة نتيجة معينة
       if (mounted) {
-        // استخدم WidgetsBinding لإضافة تأخير بسيط
         WidgetsBinding.instance.addPostFrameCallback((_) {
-          // مثلاً: _navigateToScreen(screen, id);
+          if (screen == 'result' && id != null) {
+            // يمكنك هنا جلب نتيجة الفحص من id والتنقل إليها
+            // Navigator.pushNamed(context, '/result', arguments: id);
+          } else if (screen == 'report') {
+            // Navigator.pushNamed(context, '/report');
+          }
         });
       }
     }
@@ -138,6 +185,15 @@ class _MyAppState extends ConsumerState<MyApp> {
 
   Future<void> _initDeepLinks() async {
     try {
+      // ✅ التحقق من إعدادات الروابط العميقة قبل البدء (مرتبطة بـ autoScan)
+      final settings = ref.read(settingsProvider).value;
+      final deepLinksEnabled = settings?.deepLinks ?? settings?.autoScan ?? true;
+      
+      if (!deepLinksEnabled) {
+        debugPrint('🔗 الروابط العميقة معطلة حسب الإعدادات - لن يتم الاستماع للروابط');
+        return;  // لا نستمع للروابط إذا كانت معطلة
+      }
+      
       final initialLink = await _appLinks.getInitialAppLink();
       if (initialLink != null) {
         debugPrint('📱 تم فتح التطبيق عبر رابط: $initialLink');
@@ -147,6 +203,14 @@ class _MyAppState extends ConsumerState<MyApp> {
       _linkSubscription = _appLinks.allUriLinkStream.listen((Uri? uri) {
         if (uri != null) {
           debugPrint('📱 تم استقبال رابط: $uri');
+          
+          // ✅ التحقق مرة أخرى عند وصول الرابط (للتأكد)
+          final currentSettings = ref.read(settingsProvider).value;
+          if (!(currentSettings?.deepLinks ?? currentSettings?.autoScan ?? true)) {
+            debugPrint('🔗 تم تجاهل الرابط لأن الروابط العميقة معطلة');
+            return;
+          }
+          
           _pendingLink = uri.toString();
           if (mounted) setState(() {});
         }
@@ -156,8 +220,17 @@ class _MyAppState extends ConsumerState<MyApp> {
     }
   }
 
+  // ✅ تحديث دالة معالجة الرابط المعلق للتحقق من إعدادات الروابط العميقة
   Future<void> _handlePendingLink(BuildContext context) async {
     if (_pendingLink == null || _processingDeepLink) return;
+
+    // ✅ التحقق من إعدادات الروابط العميقة (مرتبطة بـ autoScan)
+    final settings = ref.read(settingsProvider).value;
+    if (!(settings?.deepLinks ?? settings?.autoScan ?? true)) {
+      debugPrint('🔗 تم تجاهل الرابط المعلق لأن الروابط العميقة معطلة');
+      _pendingLink = null;
+      return;
+    }
 
     final link = _pendingLink!;
     final authState = ref.read(authProvider);
@@ -225,38 +298,33 @@ class _MyAppState extends ConsumerState<MyApp> {
       darkTheme: AppTheme.darkTheme,
       themeMode: isDarkMode ? ThemeMode.dark : ThemeMode.light,
       home: Consumer(
-        builder: (context, ref, child) {
-          final authState = ref.watch(authProvider);
+  builder: (context, ref, child) {
+    final authState = ref.watch(authProvider);
 
-          // ✅ 1. أولاً: أظهر الـ Splash للمدة المحددة (5 ثواني)
-          if (_showSplash) {
-            return const SplashScreen();
-          }
+    if (_showSplash) {
+      return const SplashScreen();
+    }
 
-          // ✅ 2. إذا كانت تهيئة Firebase لا تزال جارية بعد الـ Splash
-          if (authState.isInitializing) {
-            return const Scaffold(
-              body: Center(
-                child: CircularProgressIndicator(),
-              ),
-            );
-          }
+    if (authState.isInitializing) {
+      return const Scaffold(
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
 
-          // معالجة الرابط المعلق إذا كان المستخدم مسجل دخول
-          if (authState.isAuthenticated && _pendingLink != null) {
-            WidgetsBinding.instance.addPostFrameCallback((_) {
-              _handlePendingLink(context);
-            });
-          }
-
-          if (authState.isAuthenticated) {
-            return const HomeScreen();
-          } else {
-            return const LoginScreen();
-          }
-        },
-      ),
+    if (authState.isAuthenticated || authState.isGuest) {
+      if (_pendingLink != null) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          _handlePendingLink(context);
+        });
+      }
+      return const HomeScreen();
+    } else {
+      return const WelcomeScreen();
+    }
+  },
+),
       routes: {
+        '/welcome': (context) => const WelcomeScreen(),
         '/login': (context) => const LoginScreen(),
         '/register': (context) => const RegisterScreen(),
         '/home': (context) => const HomeScreen(),

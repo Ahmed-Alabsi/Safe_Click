@@ -148,17 +148,22 @@ class ScanNotifier extends StateNotifier<ScanState> {
   Future<void> refreshHistory() => _syncHistoryFromServer();
 
   Future<ScanResult?> scanLink(String link) async {
-    if (state.isScanning) return null;
+  if (state.isScanning) return null;
 
-    try {
-      state = state.copyWith(isScanning: true, lastError: null);
+  final authState = _ref.read(authProvider);
+  final isGuest = authState.isGuest;
 
-      final entity = await _scanLinkUseCase(link);
+  try {
+    state = state.copyWith(isScanning: true, lastError: null);
 
-      if (entity == null) throw Exception('تعذر فحص الرابط');
+    final entity = await _scanLinkUseCase(link);
 
-      final result = _toResult(entity);
-      
+    if (entity == null) throw Exception('تعذر فحص الرابط');
+
+    final result = _toResult(entity);
+    
+    // ✅ للمستخدمين المسجلين: احفظ في التاريخ مع قاعدة البيانات
+    if (!isGuest) {
       var newHistory = [result, ...state.scanHistory];
       
       if (newHistory.length > ScanRepository.maxHistoryItems) {
@@ -174,16 +179,30 @@ class ScanNotifier extends StateNotifier<ScanState> {
         dangerousScans: _countDangerous(newHistory),
         isScanning: false,
       );
+    } else {
+      // ✅ للزوار: أضف النتيجة محلياً فقط بدون حفظ في قاعدة البيانات
+      var newHistory = [result, ...state.scanHistory];
+      
+      if (newHistory.length > ScanRepository.maxHistoryItems) {
+        newHistory = newHistory.sublist(0, ScanRepository.maxHistoryItems);
+      }
 
-      debugPrint('✅ [Scan] Success: ${result.link} (Total: ${newHistory.length})');
-      return result;
-    } catch (e) {
-      final errorMessage = e.toString().replaceFirst('Exception: ', '');
-      debugPrint('❌ [Scan] Error: $errorMessage');
-      state = state.copyWith(lastError: errorMessage, isScanning: false);
-      return null;
+      state = state.copyWith(
+        scanHistory: newHistory,
+        dangerousScans: _countDangerous(newHistory),
+        isScanning: false,
+      );
     }
+
+    debugPrint('✅ [Scan] Success: ${result.link} (User: ${isGuest ? 'Guest' : 'Registered'})');
+    return result;
+  } catch (e) {
+    final errorMessage = e.toString().replaceFirst('Exception: ', '');
+    debugPrint('❌ [Scan] Error: $errorMessage');
+    state = state.copyWith(lastError: errorMessage, isScanning: false);
+    return null;
   }
+}
 
   Future<void> clearHistory() async {
     final userId = _ref.read(authProvider).user?.id;

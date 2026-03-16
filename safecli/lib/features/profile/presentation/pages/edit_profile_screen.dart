@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'dart:io';
@@ -169,92 +169,95 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
   }
 
   Future<void> _saveProfile() async {
-    if (!_formKey.currentState!.validate()) return;
+  if (!_formKey.currentState!.validate()) return;
 
-    final authNotifier = ref.read(authProvider.notifier);
-    final currentUser = ref.read(authProvider).user;
+  final authNotifier = ref.read(authProvider.notifier);
+  final currentUser = ref.read(authProvider).user;
 
-    // ✅ التحقق من وجود تغييرات حقيقية قبل الإرسال
-    final newName = _nameController.text.trim();
-    final bool hasNameChange = newName != (currentUser?.name ?? '');
-    final bool hasImageChange = _selectedImage != null;
+  // ✅ التحقق من وجود تغييرات حقيقية قبل الإرسال
+  final newName = _nameController.text.trim();
+  final bool hasNameChange = newName != (currentUser?.name ?? '');
+  final bool hasImageChange = _selectedImage != null;
 
-    if (!hasNameChange && !hasImageChange) {
-      if (mounted) {
+  if (!hasNameChange && !hasImageChange) {
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('لا توجد تغييرات للحفظ'),
+          backgroundColor: Colors.orange,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
+    return;
+  }
+
+  setState(() {
+    _isLoading = true;
+    _successMessage = null;
+  });
+
+  try {
+    // ✅ تحديث ذري (Atomic Update) - إرسال كل التغييرات في طلب واحد
+    final result = await authNotifier.updateProfile(
+      name: hasNameChange ? newName : null,
+      imagePath: hasImageChange ? _selectedImage!.path : null,
+    );
+
+    if (mounted) {
+      if (result) {
+        String message = 'تم تحديث الملف الشخصي بنجاح';
+        if (hasNameChange && hasImageChange) {
+          message = 'تم تحديث الاسم والصورة بنجاح';
+        } else if (hasNameChange) {
+          message = 'تم تحديث الاسم بنجاح';
+        } else if (hasImageChange) {
+          message = 'تم تحديث الصورة بنجاح';
+        }
+
+        // ✅ عرض رسالة نجاح والعودة إلى واجهة البروفايل
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('لا توجد تغييرات للحفظ'),
-            backgroundColor: Colors.orange,
+          SnackBar(
+            content: Text(message),
+            backgroundColor: Colors.green,
             behavior: SnackBarBehavior.floating,
+            duration: const Duration(seconds: 2),
           ),
         );
-      }
-      return;
-    }
 
-    setState(() {
-      _isLoading = true;
-      _successMessage = null;
-    });
-
-    try {
-      // ✅ تحديث ذري (Atomic Update) - إرسال كل التغييرات في طلب واحد
-      final result = await authNotifier.updateProfile(
-        name: hasNameChange ? newName : null,
-        imagePath: hasImageChange ? _selectedImage!.path : null,
-      );
-
-      if (mounted) {
-        if (result) {
-          String message = 'تم تحديث الملف الشخصي بنجاح';
-          if (hasNameChange && hasImageChange) {
-            message = 'تم تحديث الاسم والصورة بنجاح';
-          } else if (hasNameChange) {
-            message = 'تم تحديث الاسم بنجاح';
-          } else if (hasImageChange) {
-            message = 'تم تحديث الصورة بنجاح';
-          }
-
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(message),
-              backgroundColor: Colors.green,
-              behavior: SnackBarBehavior.floating,
-              duration: const Duration(seconds: 2),
-            ),
-          );
-
-          setState(() {
-            _selectedImage = null;
-            _isLoading = false;
-            _successMessage = message;
-          });
-        } else {
-          // جلب رسالة الخطأ من الـ AuthState إذا وجدت
-          final error = ref.read(authProvider).error;
-          setState(() => _isLoading = false);
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(error ?? 'فشل حفظ التغييرات، يرجى المحاولة مرة أخرى'),
-              backgroundColor: Colors.red,
-              behavior: SnackBarBehavior.floating,
-            ),
-          );
+        // ✅ الانتظار قليلاً ثم العودة إلى الشاشة السابقة
+        await Future.delayed(const Duration(milliseconds: 500));
+        
+        if (mounted) {
+          Navigator.pop(context); // ✅ العودة إلى واجهة البروفايل
         }
-      }
-    } catch (e) {
-      if (mounted) {
+        
+      } else {
+        // جلب رسالة الخطأ من الـ AuthState إذا وجدت
+        final error = ref.read(authProvider).error;
         setState(() => _isLoading = false);
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('فشل حفظ التغييرات بسبب خطأ غير متوقع'),
+          SnackBar(
+            content: Text(error ?? 'فشل حفظ التغييرات، يرجى المحاولة مرة أخرى'),
             backgroundColor: Colors.red,
             behavior: SnackBarBehavior.floating,
           ),
         );
       }
     }
+  } catch (e) {
+    if (mounted) {
+      setState(() => _isLoading = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('فشل حفظ التغييرات بسبب خطأ غير متوقع'),
+          backgroundColor: Colors.red,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
   }
+}
 
   @override
   Widget build(BuildContext context) {

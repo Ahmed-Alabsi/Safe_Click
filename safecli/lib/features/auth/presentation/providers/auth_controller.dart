@@ -1,4 +1,4 @@
-import 'dart:async';
+﻿import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -350,6 +350,54 @@ Future<void> _fetchUserProfileInBackground() async {
       return false;
     }
   }
+
+  // ✅ دوال الزائر (Guest Mode)
+Future<void> loginAsGuest() async {
+  state = state.copyWith(isLoading: true);
+  
+  await Future.delayed(const Duration(milliseconds: 500));
+  
+  state = AuthState(
+    isInitializing: false,
+    isLoading: false,
+    isGuest: true,
+    guestScansCount: 0,
+  );
+  
+  debugPrint('👤 دخول كزائر بنجاح');
+}
+
+Future<void> incrementGuestScanCount() async {
+  if (!state.isGuest) return;
+  
+  final newCount = state.guestScansCount + 1;
+  
+  state = state.copyWith(
+    guestScansCount: newCount,
+  );
+  
+  debugPrint('📊 عدد فحوصات الزائر: $newCount/3');
+}
+
+bool canGuestScan() {
+  return state.isGuest && state.guestScansCount < 3;
+}
+
+int getRemainingGuestScans() {
+  if (!state.isGuest) return 0;
+  return 3 - state.guestScansCount;
+}
+
+Future<void> logoutGuest() async {
+  state = AuthState(
+    isInitializing: false,
+    isLoading: false,
+    isGuest: false,
+    guestScansCount: 0,
+  );
+  
+  debugPrint('👋 تسجيل خروج الزائر');
+}
 
   Future<bool> updateProfile({String? name, String? imagePath}) async {
     state = state.copyWith(isLoading: true, clearError: true);

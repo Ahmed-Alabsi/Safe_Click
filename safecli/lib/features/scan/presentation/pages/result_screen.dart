@@ -744,93 +744,104 @@ class ResultScreen extends StatelessWidget {
   }
 
   Widget _buildActionButtons(BuildContext context, Color statusColor) {
-    final theme = Theme.of(context);
+  final theme = Theme.of(context);
 
-    return Row(
-      children: [
-        Expanded(
-          child: Container(
-            height: 56,
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(18),
-              boxShadow: [
-                BoxShadow(
-                  color: statusColor.withValues(alpha: 0.3),
-                  blurRadius: 12,
-                  offset: const Offset(0, 4),
+  return Row(
+    children: [
+      Expanded(
+        child: Container(
+          height: 56,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(18),
+            boxShadow: [
+              BoxShadow(
+                color: statusColor.withValues(alpha: 0.3),
+                blurRadius: 12,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+          child: ElevatedButton(
+            onPressed: () => _navigateToPage(context),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: statusColor,
+              foregroundColor: Colors.white,  // ✅ تغيير إلى الأبيض مباشرة
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(18),
+              ),
+              elevation: 0,
+              textStyle: const TextStyle(
+                color: Colors.white,  // ✅ تأكيد لون النص
+              ),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  scanResult.safe == false 
+                      ? Icons.warning_rounded 
+                      : Icons.open_in_browser_rounded,
+                  size: 20,
+                  color: Colors.white,  // ✅ تحديد لون الأيقونة بالأبيض
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  scanResult.safe == false ? 'فتح على مسؤوليتي' : 'فتح الرابط',
+                  style: theme.textTheme.titleSmall?.copyWith(
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,  // ✅ تحديد لون النص بالأبيض
+                  ),
                 ),
               ],
             ),
-            child: ElevatedButton(
-              onPressed: () => _navigateToPage(context),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: statusColor,
-                foregroundColor: theme.colorScheme.onPrimary,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(18),
+          ),
+        ),
+      ),
+      const SizedBox(width: 12),
+      Expanded(
+        child: Container(
+          height: 56,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(
+              color: theme.colorScheme.outline,
+              width: 1.5,
+            ),
+          ),
+          child: OutlinedButton(
+            onPressed: () => Navigator.pop(context),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: theme.colorScheme.onSurface,
+              padding: const EdgeInsets.symmetric(vertical: 16),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(18),
+              ),
+              side: const BorderSide(color: Colors.transparent),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  Icons.arrow_back_rounded, 
+                  size: 20,
+                  color: theme.colorScheme.onSurface,
                 ),
-                elevation: 0,
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(
-                    scanResult.safe == false 
-                        ? Icons.warning_rounded 
-                        : Icons.open_in_browser_rounded,
-                    size: 20,
+                const SizedBox(width: 8),
+                Text(
+                  'رجوع',
+                  style: theme.textTheme.titleSmall?.copyWith(
+                    fontWeight: FontWeight.w500,
+                    color: theme.colorScheme.onSurface,
                   ),
-                  const SizedBox(width: 8),
-                  Text(
-                    scanResult.safe == false ? 'فتح على مسؤوليتي' : 'فتح الرابط',
-                    style: theme.textTheme.titleSmall?.copyWith(
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ],
-              ),
+                ),
+              ],
             ),
           ),
         ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: Container(
-            height: 56,
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(18),
-              border: Border.all(
-                color: theme.colorScheme.outline,
-                width: 1.5,
-              ),
-            ),
-            child: OutlinedButton(
-              onPressed: () => Navigator.pop(context),
-              style: OutlinedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(vertical: 16),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(18),
-                ),
-                side: const BorderSide(color: Colors.transparent),
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const Icon(Icons.arrow_back_rounded, size: 20),
-                  const SizedBox(width: 8),
-                  Text(
-                    'رجوع',
-                    style: theme.textTheme.titleSmall?.copyWith(
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-      ],
-    );
-  }
+      ),
+    ],
+  );
+}
 
   Future<void> _navigateToPage(BuildContext context) async {
     String url = scanResult.link;
@@ -846,7 +857,7 @@ class ResultScreen extends StatelessWidget {
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(28),
           ),
-          title: Row(
+          title: Column(  // ✅ تغيير Row إلى Column
             children: [
               Container(
                 padding: const EdgeInsets.all(8),
@@ -857,44 +868,62 @@ class ResultScreen extends StatelessWidget {
                 child: Icon(
                   Icons.warning_amber_rounded,
                   color: Theme.of(context).colorScheme.error,
-                  size: 28,
+                  size: 48,  // ✅ تكبير حجم الأيقونة
                 ),
               ),
-              const SizedBox(width: 12),
+              const SizedBox(height: 16),
               const Text(
                 'تحذير!',
-                style: TextStyle(fontWeight: FontWeight.bold),
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 24,  // ✅ تكبير حجم الخط
+                ),
+                textAlign: TextAlign.center,  // ✅ توسيط النص
               ),
             ],
           ),
           content: const Text(
             'هذا الرابط قد يكون خطيراً. هل أنت متأكد من المتابعة؟',
             style: TextStyle(fontSize: 16),
+            textAlign: TextAlign.center,  // ✅ توسيط النص
           ),
+          actionsAlignment: MainAxisAlignment.center,  // ✅ توسيط الأزرار
           actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context, false),
-              style: TextButton.styleFrom(
-                foregroundColor: Theme.of(context).colorScheme.onSurfaceVariant,
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16),
+            Row(  // ✅ استخدام Row لتوسيط الأزرار بشكل أفضل
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context, false),
+                  style: TextButton.styleFrom(
+                    foregroundColor: Theme.of(context).colorScheme.onSurfaceVariant,
+                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                  ),
+                  child: const Text(
+                    'إلغاء',
+                    style: TextStyle(fontSize: 16),
+                  ),
                 ),
-              ),
-              child: const Text('إلغاء'),
-            ),
-            ElevatedButton(
-              onPressed: () => Navigator.pop(context, true),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Theme.of(context).colorScheme.error,
-                foregroundColor: Theme.of(context).colorScheme.onError,
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16),
+                const SizedBox(width: 12),
+                ElevatedButton(
+                  onPressed: () => Navigator.pop(context, true),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Theme.of(context).colorScheme.error,
+                    foregroundColor: Colors.white,  // استخدام الأبيض مباشرة بدلاً من theme
+                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    elevation: 2,
+                  ),
+                  child: const Text(
+                    'متابعة',
+                    style: TextStyle(fontSize: 16),
+                  ),
                 ),
-                elevation: 2,
-              ),
-              child: const Text('متابعة'),
+              ],
             ),
           ],
         ),

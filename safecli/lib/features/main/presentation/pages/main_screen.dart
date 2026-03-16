@@ -4,6 +4,7 @@ import 'package:safeclik/features/settings/presentation/providers/settings_contr
 import 'package:safeclik/features/scan/presentation/controllers/scan_notifier.dart';
 import 'package:safeclik/features/profile/presentation/widgets/stats_card.dart';
 import 'package:safeclik/features/scan/presentation/pages/result_screen.dart';
+import 'package:safeclik/features/auth/presentation/providers/auth_controller.dart';
 import 'dart:io';
 import 'dart:async';
 import 'package:dio/dio.dart';
@@ -159,64 +160,140 @@ class _MainScreenState extends ConsumerState<MainScreen> with TickerProviderStat
     );
   }
 
-  Widget _buildHeader() {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(vertical: 20),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            Theme.of(context).colorScheme.tertiary,
-            Theme.of(context).colorScheme.tertiaryContainer,
-          ],
-        ),
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: Theme.of(context).shadowColor,
-            blurRadius: 15,
-            offset: const Offset(0, 5),
-          ),
-        ],
-      ),
-      child: Column(
+  void _showLoginDialog() {
+  showDialog(
+    context: context,
+    builder: (context) => AlertDialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      title: const Row(
         children: [
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: Theme.of(context).colorScheme.onTertiary.withValues(alpha: 0.2),
-              shape: BoxShape.circle,
-            ),
-            child: Icon(
-              Icons.security_rounded,
-              size: 40,
-              color: Theme.of(context).colorScheme.onTertiary,
-            ),
-          ),
-          const SizedBox(height: 10),
-          Text(
-            'Safe Click',
-            style: TextStyle(
-              fontSize: 28,
-              fontWeight: FontWeight.bold,
-              color: Theme.of(context).colorScheme.onTertiary,
-            ),
-          ),
-          const SizedBox(height: 5),
-          Text(
-            'حماية ذكية من الروابط الضارة والتصيد الإلكتروني',
-            style: TextStyle(
-              fontSize: 14,
-              color: Theme.of(context).colorScheme.onTertiary.withValues(alpha: 0.9),
-            ),
-            textAlign: TextAlign.center,
-          ),
+          Icon(Icons.login_rounded, color: Colors.orange),
+          SizedBox(width: 12),
+          Text('انتهت الفحوصات المجانية'),
         ],
       ),
-    );
-  }
+      content: const Text(
+        'لقد استخدمت جميع الفحوصات المجانية المتاحة (3 فحوصات).\n\n'
+        'قم بتسجيل الدخول أو إنشاء حساب جديد للاستمرار.'
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('إلغاء'),
+        ),
+        ElevatedButton(
+          onPressed: () {
+            Navigator.pop(context);
+            Navigator.pushNamed(context, '/login');
+          },
+          style: ElevatedButton.styleFrom(
+            backgroundColor: Colors.orange,
+            foregroundColor: Colors.white,
+          ),
+          child: const Text('تسجيل الدخول'),
+        ),
+      ],
+    ),
+  );
+}
+
+  Widget _buildHeader() {
+  final authState = ref.watch(authProvider);
+  final isGuest = authState.isGuest;
+  final remainingScans = isGuest ? authState.remainingGuestScans : 0; // ✅ استخدام getter مباشرة
+  
+  return Container(
+    width: double.infinity,
+    padding: const EdgeInsets.symmetric(vertical: 20),
+    decoration: BoxDecoration(
+      gradient: LinearGradient(
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+        colors: isGuest
+            ? [
+                Colors.orange,
+                Colors.orange.withValues(alpha: 0.8),
+                Colors.amber,
+              ]
+            : [
+                Theme.of(context).colorScheme.tertiary,
+                Theme.of(context).colorScheme.tertiaryContainer,
+              ],
+      ),
+      borderRadius: BorderRadius.circular(20),
+      boxShadow: [
+        BoxShadow(
+          color: Theme.of(context).shadowColor,
+          blurRadius: 15,
+          offset: const Offset(0, 5),
+        ),
+      ],
+    ),
+    child: Column(
+      children: [
+        if (isGuest)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.2),
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: Colors.white.withValues(alpha: 0.3)),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.qr_code_scanner_rounded, size: 16, color: Colors.white),
+                  const SizedBox(width: 6),
+                  Text(
+                    'متبقي $remainingScans/3 فحوصات',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 12,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: Theme.of(context).colorScheme.onTertiary.withValues(alpha: 0.2),
+            shape: BoxShape.circle,
+          ),
+          child: Icon(
+            Icons.security_rounded,
+            size: 40,
+            color: Theme.of(context).colorScheme.onTertiary,
+          ),
+        ),
+        const SizedBox(height: 10),
+        Text(
+          'Safe Click',
+          style: TextStyle(
+            fontSize: 28,
+            fontWeight: FontWeight.bold,
+            color: Theme.of(context).colorScheme.onTertiary,
+          ),
+        ),
+        const SizedBox(height: 5),
+        Text(
+          isGuest
+              ? 'مرحباً بك كزائر - استمتع بفحص 3 روابط مجاناً'
+              : 'حماية ذكية من الروابط الضارة والتصيد الإلكتروني',
+          style: TextStyle(
+            fontSize: 14,
+            color: Theme.of(context).colorScheme.onTertiary.withValues(alpha: 0.9),
+          ),
+          textAlign: TextAlign.center,
+        ),
+      ],
+    ),
+  );
+}
 
   Widget _buildScanCard() {
     final settingsAsyncValue = ref.watch(settingsProvider);
@@ -284,29 +361,61 @@ class _MainScreenState extends ConsumerState<MainScreen> with TickerProviderStat
             Row(
               children: [
                 Expanded(
-                  child: ElevatedButton.icon(
-                    onPressed: scanState.isScanning
-                        ? null
-                        : () => _performScan(context),
-                    icon: const Icon(Icons.search),
-                    label: scanState.isScanning
-                        ? SizedBox(
-                            height: 20,
-                            width: 20,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              valueColor: AlwaysStoppedAnimation<Color>(Theme.of(context).colorScheme.onPrimary),
-                            ),
-                          )
-                        : const Text('فحص الرابط'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Theme.of(context).colorScheme.primary,
-                      foregroundColor: Theme.of(context).colorScheme.onPrimary,
-                      padding: const EdgeInsets.symmetric(vertical: 15),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
+                  child: Container(
+                    height: 56,
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [
+                          Theme.of(context).colorScheme.primary,
+                          Theme.of(context).colorScheme.secondary,
+                        ],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
                       ),
-                      elevation: 3,
+                      borderRadius: BorderRadius.circular(20),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.4),
+                          blurRadius: 15,
+                          offset: const Offset(0, 6),
+                          spreadRadius: 1,
+                        ),
+                      ],
+                    ),
+                    child: ElevatedButton(
+                      onPressed: scanState.isScanning ? null : () => _performScan(context),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.transparent,
+                        foregroundColor: Colors.white,
+                        shadowColor: Colors.transparent,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        elevation: 0,
+                      ),
+                      child: scanState.isScanning
+                          ? const SizedBox(
+                              height: 24,
+                              width: 24,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                              ),
+                            )
+                          : Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                const Icon(Icons.search, size: 20),
+                                const SizedBox(width: 8),
+                                Text(
+                                  'فحص الرابط',
+                                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                              ],
+                            ),
                     ),
                   ),
                 ),
@@ -352,180 +461,87 @@ class _MainScreenState extends ConsumerState<MainScreen> with TickerProviderStat
   }
 
   Future<void> _performScan(BuildContext context) async {
-    if (ref.read(scanNotifierProvider).isScanning) return;
-
-    if (_linkController.text.trim().isEmpty) {
-      ScaffoldMessenger.of(context).clearSnackBars();
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Text('يرجى إدخال رابط لفحصه'),
-          backgroundColor: Theme.of(context).colorScheme.error,
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
+  final authState = ref.read(authProvider);
+  final authNotifier = ref.read(authProvider.notifier);
+  
+  // التحقق من الزائر
+  if (authState.isGuest) {
+    if (!authNotifier.canGuestScan()) {
+      _showLoginDialog();
       return;
     }
+  }
 
-    // التحقق من الاتصال بالإنترنت
-    final hasInternet = await _checkInternetConnectivity();
-    if (!hasInternet) {
-      if (!context.mounted) return;
-      showDialog(
-        context: context,
-        builder: (ctx) => AlertDialog(
-          icon: Icon(
-            Icons.wifi_off_rounded,
-            color: Theme.of(context).colorScheme.error,
-            size: 48,
-          ),
-          title: const Text('لا يوجد اتصال بالإنترنت'),
-          content: const Text(
-            'يرجى التحقق من اتصالك بالإنترنت والمحاولة مرة أخرى.\n\n'
-            'تأكد من:'
-            '\n• تفعيل الواي فاي أو البيانات'
-            '\n• استقرار الشبكة'
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx),
-              child: const Text('حسناً'),
-            ),
-          ],
-        ),
-      );
-      return;
-    }
+  if (ref.read(scanNotifierProvider).isScanning) return;
 
-    // التحقق من سرعة الإنترنت
-    final isSpeedGood = await _checkInternetSpeed();
-    if (!isSpeedGood) {
-      if (!context.mounted) return;
-      final proceed = await showDialog<bool>(
-        context: context,
-        builder: (ctx) => AlertDialog(
-          icon: Icon(
-            Icons.speed,
-            color: Colors.orange,
-            size: 48,
-          ),
-          title: const Text('اتصال الإنترنت بطيء'),
-          content: const Text(
-            'اتصال الإنترنت الحالي بطيء وقد يستغرق الفحص وقتاً أطول من المعتاد.\n\n'
-            'هل تريد المتابعة على أي حال؟'
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx, false),
-              child: const Text('إلغاء'),
-            ),
-            ElevatedButton(
-              onPressed: () => Navigator.pop(ctx, true),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.orange,
-                foregroundColor: Colors.white,
-              ),
-              child: const Text('متابعة على أي حال'),
-            ),
-          ],
-        ),
-      );
-      
-      if (!context.mounted || proceed != true) return;
-      
-      // عرض مؤشر مع رسالة توضيحية
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Row(
-            children: [
-              Icon(Icons.warning_amber, color: Colors.white, size: 20),
-              SizedBox(width: 8),
-              Expanded(child: Text('جاري الفحص... قد يستغرق وقتاً أطول بسبب بطء الاتصال')),
-            ],
-          ),
-          backgroundColor: Colors.orange,
-          behavior: SnackBarBehavior.floating,
-          duration: const Duration(seconds: 3),
-        ),
-      );
-    }
+  if (_linkController.text.trim().isEmpty) {
+    ScaffoldMessenger.of(context).clearSnackBars();
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: const Text('يرجى إدخال رابط لفحصه'),
+        backgroundColor: Theme.of(context).colorScheme.error,
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+    return;
+  }
 
-    // محاولة الفحص مع timeout
-    try {
-      final result = await ref
-          .read(scanNotifierProvider.notifier)
-          .scanLink(_linkController.text.trim())
-          .timeout(
-            const Duration(seconds: 30),
-            onTimeout: () {
-              throw TimeoutException('استغرق الفحص وقتاً طويلاً');
-            },
-          );
-
-      if (!context.mounted) return;
-
-      if (result != null) {
-        _linkController.clear();
-        _linkFocusNode.unfocus();
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (context) => ResultScreen(scanResult: result),
+  // التحقق من الاتصال بالإنترنت
+  final hasInternet = await _checkInternetConnectivity();
+  if (!hasInternet) {
+    if (!context.mounted) return;
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        icon: Icon(Icons.wifi_off_rounded, color: Theme.of(context).colorScheme.error, size: 48),
+        title: const Text('لا يوجد اتصال بالإنترنت'),
+        content: const Text('يرجى التحقق من اتصالك بالإنترنت والمحاولة مرة أخرى.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('حسناً'),
           ),
+        ],
+      ),
+    );
+    return;
+  }
+
+  try {
+    final result = await ref
+        .read(scanNotifierProvider.notifier)
+        .scanLink(_linkController.text.trim())
+        .timeout(
+          const Duration(seconds: 30),
+          onTimeout: () {
+            throw TimeoutException('استغرق الفحص وقتاً طويلاً');
+          },
         );
-      } else {
-        final scanState = ref.read(scanNotifierProvider);
-        final errorMsg = _getUserFriendlyErrorMessage(null, scanState.lastError);
-        
-        showDialog(
-          context: context,
-          builder: (ctx) => AlertDialog(
-            title: const Text('فشل الفحص'),
-            content: Text(errorMsg),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(ctx),
-                child: const Text('موافق'),
-              ),
-            ],
-          ),
-        );
+
+    if (!context.mounted) return;
+
+    if (result != null) {
+      // زيادة عدد فحوصات الزائر فقط بعد الفحص الناجح
+      if (authState.isGuest) {
+        await authNotifier.incrementGuestScanCount();
       }
-    } on TimeoutException catch (_) {
-      if (!context.mounted) return;
-      showDialog(
-        context: context,
-        builder: (ctx) => AlertDialog(
-          icon: Icon(
-            Icons.timer_off,
-            color: Colors.orange,
-            size: 48,
-          ),
-          title: const Text('انتهت مهلة الفحص'),
-          content: const Text(
-            'استغرق الفحص وقتاً طويلاً جداً. هذا قد يكون بسبب:\n'
-            '• ضعف شديد في الاتصال\n'
-            '• مشكلة في الخادم\n'
-            '• الرابط غير مستجيب\n\n'
-            'يرجى المحاولة مرة أخرى لاحقاً.'
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx),
-              child: const Text('حسناً'),
-            ),
-          ],
+      
+      _linkController.clear();
+      _linkFocusNode.unfocus();
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => ResultScreen(scanResult: result),
         ),
       );
-    } catch (e) {
-      if (!context.mounted) return;
-      
-      // استخدام الدالة الجديدة لمعالجة الخطأ
-      final errorMsg = _getUserFriendlyErrorMessage(e, null);
+    } else {
+      final scanState = ref.read(scanNotifierProvider);
+      final errorMsg = _getUserFriendlyErrorMessage(null, scanState.lastError);
       
       showDialog(
         context: context,
         builder: (ctx) => AlertDialog(
-          title: const Text('مشكلة في السيرفر'),
+          title: const Text('فشل الفحص'),
           content: Text(errorMsg),
           actions: [
             TextButton(
@@ -536,7 +552,24 @@ class _MainScreenState extends ConsumerState<MainScreen> with TickerProviderStat
         ),
       );
     }
+  } catch (e) {
+    if (!context.mounted) return;
+    final errorMsg = _getUserFriendlyErrorMessage(e, null);
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('مشكلة في السيرفر'),
+        content: Text(errorMsg),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('موافق'),
+          ),
+        ],
+      ),
+    );
   }
+}
 
   void shareApp() {
     ScaffoldMessenger.of(context).showSnackBar(

@@ -84,19 +84,19 @@ class SettingsScreen extends ConsumerWidget {
         _buildSwitchTile(
           context: context,
           title: 'الإشعارات',
-          subtitle: 'إشعارات عند اكتشاف روابط ضارة',
+          subtitle: 'الإشعارات الموجهه من إدارة النظام',
           value: settings.notifications,
           icon: Icons.notifications,
           onChanged: (value) => notifier.toggleNotifications(value),
         ),
-        // _buildSwitchTile(
-        //   context: context,
-        //   title: 'حفظ السجل',
-        //   subtitle: 'حفظ سجل الفحوصات السابقة',
-        //   value: settings.saveHistory,
-        //   icon: Icons.save,
-        //   onChanged: (value) => notifier.toggleSaveHistory(value),
-        // ),
+        _buildSwitchTile(
+          context: context,
+          title: 'فحص الرابط تلقائي',
+          subtitle: 'فحص الروابط تلقائياً عند النقر عليها',
+          value: settings.autoScan,  // ✅ استخدام المتغير الخاص بالمسح التلقائي
+          icon: Icons.auto_awesome_rounded,  // ✅ أيقونة تناسب المسح التلقائي
+          onChanged: (value) => notifier.toggleAutoScan(value),  // ✅ دالة التبديل للمسح التلقائي
+        ),
         _buildLanguageTile(context, settings, notifier),
       ],
     );
@@ -696,28 +696,133 @@ class SettingsScreen extends ConsumerWidget {
   }
 
   Widget _buildLanguageTile(BuildContext context, SettingsModel settings, SettingsNotifier notifier) {
-    return ListTile(
-      leading: Container(
-        padding: const EdgeInsets.all(8),
-        decoration: BoxDecoration(
-          color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.1),
-          shape: BoxShape.circle,
+  final theme = Theme.of(context);
+  
+  return ListTile(
+    leading: Container(
+      padding: const EdgeInsets.all(8),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.primary.withValues(alpha: 0.1),
+        shape: BoxShape.circle,
+      ),
+      child: Icon(Icons.language, color: theme.colorScheme.primary),
+    ),
+    title: const Text('اللغة'),
+    subtitle: Text(settings.language == 'ar' ? 'العربية' : 'English'),
+    trailing: Container(
+      decoration: BoxDecoration(
+        color: theme.colorScheme.primary.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(30),
+        border: Border.all(
+          color: theme.colorScheme.primary.withValues(alpha: 0.3),
+          width: 1,
         ),
-        child: Icon(Icons.language, color: Theme.of(context).colorScheme.primary),
       ),
-      title: const Text('اللغة'),
-      subtitle: Text(settings.language == 'ar' ? 'العربية' : 'English'),
-      trailing: DropdownButton<String>(
-        value: settings.language,
-        underline: const SizedBox(),
-        items: const [
-          DropdownMenuItem(value: 'ar', child: Text('العربية')),
-          DropdownMenuItem(value: 'en', child: Text('English')),
-        ],
-        onChanged: (value) { if (value != null) notifier.changeLanguage(value); },
+      child: DropdownButtonHideUnderline(
+        child: DropdownButton<String>(
+          value: settings.language,
+          icon: Icon(
+            Icons.keyboard_arrow_down_rounded,
+            color: theme.colorScheme.primary,
+          ),
+          iconSize: 24,
+          elevation: 8,
+          dropdownColor: theme.colorScheme.surface,
+          style: theme.textTheme.bodyMedium?.copyWith(
+            color: theme.colorScheme.onSurface,
+          ),
+          borderRadius: BorderRadius.circular(16),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+          items: [
+            DropdownMenuItem(
+              value: 'ar',
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(8),
+                  color: settings.language == 'ar' 
+                      ? theme.colorScheme.primary.withValues(alpha: 0.1) 
+                      : Colors.transparent,
+                ),
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.flag_rounded,
+                      size: 16,
+                      color: settings.language == 'ar' 
+                          ? theme.colorScheme.primary 
+                          : theme.colorScheme.onSurfaceVariant,
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      'العربية',
+                      style: TextStyle(
+                        color: settings.language == 'ar' 
+                            ? theme.colorScheme.primary 
+                            : theme.colorScheme.onSurface,
+                      ),
+                    ),
+                    if (settings.language == 'ar') ...[
+                      const SizedBox(width: 8),
+                      Icon(
+                        Icons.check_circle_rounded,
+                        size: 16,
+                        color: theme.colorScheme.primary,
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ),
+            DropdownMenuItem(
+              value: 'en',
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(8),
+                  color: settings.language == 'en' 
+                      ? theme.colorScheme.primary.withValues(alpha: 0.1) 
+                      : Colors.transparent,
+                ),
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.language_rounded,
+                      size: 16,
+                      color: settings.language == 'en' 
+                          ? theme.colorScheme.primary 
+                          : theme.colorScheme.onSurfaceVariant,
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      'English',
+                      style: TextStyle(
+                        color: settings.language == 'en' 
+                            ? theme.colorScheme.primary 
+                            : theme.colorScheme.onSurface,
+                      ),
+                    ),
+                    if (settings.language == 'en') ...[
+                      const SizedBox(width: 8),
+                      Icon(
+                        Icons.check_circle_rounded,
+                        size: 16,
+                        color: theme.colorScheme.primary,
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ),
+          ],
+          onChanged: (value) { 
+            if (value != null) notifier.changeLanguage(value); 
+          },
+        ),
       ),
-    );
-  }
+    ),
+  );
+}
 
   // Widget _buildScanLevelTile(BuildContext context, SettingsModel settings, SettingsNotifier notifier) {
   //   const levelNames = {'basic': 'أساسي', 'standard': 'قياسي', 'deep': 'عميق'};

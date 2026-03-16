@@ -1,6 +1,7 @@
 ﻿class SettingsModel {
   bool autoScan;
   bool notifications;
+  bool deepLinks;
   String language;
   bool safeBrowsing;
   bool darkMode;
@@ -12,6 +13,7 @@
   SettingsModel({
     this.autoScan = true,
     this.notifications = true,
+    this.deepLinks = true,
     this.language = 'ar',
     this.safeBrowsing = true,
     this.darkMode = false,
@@ -24,6 +26,7 @@
   Map<String, dynamic> toJson() => {
         'autoScan': autoScan,
         'notifications': notifications,
+        'deepLinks': deepLinks,
         'language': language,
         'safeBrowsing': safeBrowsing,
         'darkMode': darkMode,
@@ -36,6 +39,7 @@
   factory SettingsModel.fromJson(Map<String, dynamic> json) => SettingsModel(
         autoScan: json['autoScan'] ?? true,
         notifications: json['notifications'] ?? true,
+        deepLinks: json['deepLinks'] ?? true,
         language: json['language'] ?? 'ar',
         safeBrowsing: json['safeBrowsing'] ?? true,
         darkMode: json['darkMode'] ?? false,
@@ -48,6 +52,7 @@
   SettingsModel copyWith({
     bool? autoScan,
     bool? notifications,
+    bool? deepLinks,
     String? language,
     bool? safeBrowsing,
     bool? darkMode,
@@ -59,6 +64,7 @@
     return SettingsModel(
       autoScan: autoScan ?? this.autoScan,
       notifications: notifications ?? this.notifications,
+      deepLinks: deepLinks ?? this.deepLinks,
       language: language ?? this.language,
       safeBrowsing: safeBrowsing ?? this.safeBrowsing,
       darkMode: darkMode ?? this.darkMode,

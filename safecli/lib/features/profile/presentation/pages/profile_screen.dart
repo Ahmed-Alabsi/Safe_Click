@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:safeclik/features/auth/presentation/providers/auth_controller.dart';
 import 'package:safeclik/features/scan/presentation/controllers/scan_notifier.dart';
@@ -1062,7 +1062,7 @@ Widget _buildStatsSection(BuildContext context, dynamic user, ThemeData theme, W
             gradient: LinearGradient(
               colors: [
                 theme.colorScheme.surface,
-                theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+                theme.colorScheme.surfaceContainerHighest.withValues(alpha: 1.5),
               ],
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,

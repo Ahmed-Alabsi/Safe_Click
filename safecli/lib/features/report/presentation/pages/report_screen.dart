@@ -1,4 +1,4 @@
-import 'dart:async';
+﻿import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:safeclik/features/report/presentation/providers/report_controller.dart';
@@ -431,97 +431,364 @@ class _ReportScreenState extends ConsumerState<ReportScreen> with SingleTickerPr
   );
 }
 
-  // ✅ حقل نوع التهديد البارز
-  Widget _buildCategoryField(BuildContext context) {
-    final theme = Theme.of(context);
+  // ✅ حقل نوع التهديد البارز - تصميم محدث مع Dropdown
+Widget _buildCategoryField(BuildContext context) {
+  final theme = Theme.of(context);
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(4),
-              decoration: BoxDecoration(
-                color: theme.colorScheme.primary.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(6),
-              ),
-              child: Icon(Icons.category_rounded, size: 16, color: theme.colorScheme.primary),
+  return Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(4),
+            decoration: BoxDecoration(
+              color: theme.colorScheme.primary.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(6),
             ),
-            const SizedBox(width: 8),
-            Text(
-              'نوع التهديد',
-              style: theme.textTheme.titleSmall?.copyWith(
-                fontWeight: FontWeight.w600,
-                color: theme.colorScheme.onSurface,
-              ),
+            child: Icon(Icons.category_rounded, size: 16, color: theme.colorScheme.primary),
+          ),
+          const SizedBox(width: 8),
+          Text(
+            'نوع التهديد',
+            style: theme.textTheme.titleSmall?.copyWith(
+              fontWeight: FontWeight.w600,
+              color: theme.colorScheme.onSurface,
             ),
-            const Text(
-              ' *',
-              style: TextStyle(color: Colors.red, fontSize: 16),
+          ),
+          const Text(
+            ' *',
+            style: TextStyle(color: Colors.red, fontSize: 16),
+          ),
+        ],
+      ),
+      const SizedBox(height: 8),
+      
+      // تصميم Dropdown محدث وأجمل
+      Container(
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(20),
+          gradient: LinearGradient(
+            colors: [
+              theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.1),
+              theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.2),
+            ],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+          border: Border.all(
+            color: theme.colorScheme.outline.withValues(alpha: 0.2),
+            width: 1.5,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.05),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
             ),
           ],
         ),
-        const SizedBox(height: 8),
-        Container(
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(16),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.05),
-                blurRadius: 8,
-                offset: const Offset(0, 2),
-              ),
-            ],
-          ),
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            decoration: BoxDecoration(
-              color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(
-                color: theme.colorScheme.outline.withValues(alpha: 0.2),
-              ),
-            ),
-            child: DropdownButtonHideUnderline(
-              child: DropdownButton<String>(
-                value: _selectedCategory,
-                hint: Text(
-                  'اختر نوع التهديد',
-                  style: theme.textTheme.bodyMedium?.copyWith(
-                    color: theme.colorScheme.onSurfaceVariant,
-                  ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(20),
+          child: Material(
+            color: Colors.transparent,
+            child: InkWell(
+              onTap: () {
+                // فتح القائمة المنسدلة
+                FocusScope.of(context).unfocus();
+                _showCategoryDropdown(context);
+              },
+              borderRadius: BorderRadius.circular(20),
+              splashColor: theme.colorScheme.primary.withValues(alpha: 0.1),
+              highlightColor: Colors.transparent,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                child: Row(
+                  children: [
+                    // أيقونة مختارة حسب الفئة
+                    Container(
+                      padding: const EdgeInsets.all(6),
+                      decoration: BoxDecoration(
+                        color: _selectedCategory != null
+                            ? theme.colorScheme.primary.withValues(alpha: 0.1)
+                            : Colors.transparent,
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Icon(
+                        _getCategoryIcon(_selectedCategory ?? 'category'),
+                        size: 18,
+                        color: _selectedCategory != null
+                            ? theme.colorScheme.primary
+                            : theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.5),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    
+                    // النص المعروض
+                    Expanded(
+                      child: Text(
+                        _selectedCategory ?? 'اختر نوع التهديد',
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          color: _selectedCategory != null
+                              ? theme.colorScheme.onSurface
+                              : theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.7),
+                          fontWeight: _selectedCategory != null ? FontWeight.w500 : FontWeight.normal,
+                        ),
+                      ),
+                    ),
+                    
+                    // السهم مع تصميم جميل
+                    Container(
+                      padding: const EdgeInsets.all(6),
+                      decoration: BoxDecoration(
+                        color: theme.colorScheme.primary.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Icon(
+                        Icons.keyboard_arrow_down_rounded,
+                        color: theme.colorScheme.primary,
+                        size: 20,
+                      ),
+                    ),
+                  ],
                 ),
-                isExpanded: true,
-                icon: Container(
-                  padding: const EdgeInsets.all(4),
-                  decoration: BoxDecoration(
-                    color: theme.colorScheme.primary.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Icon(
-                    Icons.keyboard_arrow_down_rounded,
-                    color: theme.colorScheme.primary,
-                  ),
-                ),
-                dropdownColor: theme.colorScheme.surface,
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  color: theme.colorScheme.onSurface,
-                ),
-                items: _categories.map((category) {
-                  return DropdownMenuItem(
-                    value: category,
-                    child: Text(category),
-                  );
-                }).toList(),
-                onChanged: (value) => setState(() => _selectedCategory = value),
               ),
             ),
           ),
         ),
-      ],
-    );
+      ),
+      
+      // عرض الفئة المختارة بشكل بارز (اختياري)
+      if (_selectedCategory != null)
+        Padding(
+          padding: const EdgeInsets.only(top: 8, right: 8),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            decoration: BoxDecoration(
+              color: theme.colorScheme.primary.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(30),
+              border: Border.all(
+                color: theme.colorScheme.primary.withValues(alpha: 0.3),
+                width: 1,
+              ),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  Icons.check_circle_rounded,
+                  size: 14,
+                  color: theme.colorScheme.primary,
+                ),
+                const SizedBox(width: 6),
+                Text(
+                  'تم اختيار: $_selectedCategory',
+                  style: theme.textTheme.labelSmall?.copyWith(
+                    color: theme.colorScheme.primary,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+    ],
+  );
+}
+
+// دالة مساعدة لعرض القائمة المنسدلة بشكل جميل
+Future<void> _showCategoryDropdown(BuildContext context) async {
+  final theme = Theme.of(context);
+  final result = await showModalBottomSheet<String>(
+    context: context,
+    backgroundColor: Colors.transparent,
+    isScrollControlled: true,
+    builder: (context) => Container(
+      decoration: BoxDecoration(
+        color: theme.scaffoldBackgroundColor,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(30)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.1),
+            blurRadius: 20,
+            offset: const Offset(0, -5),
+          ),
+        ],
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // مقبض السحب
+          Container(
+            margin: const EdgeInsets.only(top: 12),
+            width: 50,
+            height: 5,
+            decoration: BoxDecoration(
+              color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.3),
+              borderRadius: BorderRadius.circular(10),
+            ),
+          ),
+          
+          // العنوان
+          Padding(
+            padding: const EdgeInsets.all(20),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [
+                        theme.colorScheme.primary,
+                        theme.colorScheme.secondary,
+                      ],
+                    ),
+                    borderRadius: BorderRadius.circular(12),
+                    boxShadow: [
+                      BoxShadow(
+                        color: theme.colorScheme.primary.withValues(alpha: 0.3),
+                        blurRadius: 8,
+                        offset: const Offset(0, 3),
+                      ),
+                    ],
+                  ),
+                  child: const Icon(Icons.category_rounded, color: Colors.white, size: 20),
+                ),
+                const SizedBox(width: 12),
+                Text(
+                  'اختر نوع التهديد',
+                  style: theme.textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          
+          const Divider(height: 1),
+          
+          // قائمة الفئات
+          Flexible(
+            child: ListView.separated(
+              shrinkWrap: true,
+              padding: const EdgeInsets.all(16),
+              itemCount: _categories.length,
+              separatorBuilder: (_, __) => const SizedBox(height: 8),
+              itemBuilder: (context, index) {
+                final category = _categories[index];
+                final isSelected = _selectedCategory == category;
+                
+                return Material(
+                  color: Colors.transparent,
+                  child: InkWell(
+                    onTap: () => Navigator.pop(context, category),
+                    borderRadius: BorderRadius.circular(16),
+                    child: Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        gradient: isSelected
+                            ? LinearGradient(
+                                colors: [
+                                  theme.colorScheme.primary.withValues(alpha: 0.1),
+                                  theme.colorScheme.secondary.withValues(alpha: 0.1),
+                                ],
+                              )
+                            : null,
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(
+                          color: isSelected
+                              ? theme.colorScheme.primary
+                              : theme.colorScheme.outline.withValues(alpha: 0.2),
+                          width: isSelected ? 2 : 1,
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          // أيقونة الفئة
+                          Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: isSelected
+                                  ? theme.colorScheme.primary
+                                  : theme.colorScheme.primary.withValues(alpha: 0.1),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Icon(
+                              _getCategoryIcon(category),
+                              size: 20,
+                              color: isSelected ? Colors.white : theme.colorScheme.primary,
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          
+                          // اسم الفئة
+                          Expanded(
+                            child: Text(
+                              category,
+                              style: theme.textTheme.bodyLarge?.copyWith(
+                                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                                color: isSelected ? theme.colorScheme.primary : theme.colorScheme.onSurface,
+                              ),
+                            ),
+                          ),
+                          
+                          // علامة الاختيار
+                          if (isSelected)
+                            Container(
+                              padding: const EdgeInsets.all(4),
+                              decoration: BoxDecoration(
+                                color: theme.colorScheme.primary,
+                                shape: BoxShape.circle,
+                              ),
+                              child: const Icon(
+                                Icons.check_rounded,
+                                color: Colors.white,
+                                size: 16,
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+          
+          const SizedBox(height: 20),
+        ],
+      ),
+    ),
+  );
+  
+  if (result != null && mounted) {
+    setState(() {
+      _selectedCategory = result;
+    });
   }
+}
+
+// دالة مساعدة للحصول على أيقونة لكل فئة
+IconData _getCategoryIcon(String category) {
+  switch (category) {
+    case 'تصيد احتيالي':
+      return Icons.phishing_rounded;
+    case 'برمجيات خبيثة':
+      return Icons.bug_report_rounded;
+    case 'احتيال مالي':
+      return Icons.attach_money_rounded;
+    case 'محتوى غير لائق':
+      return Icons.warning_rounded;
+    case 'بريد عشوائي':
+      return Icons.mark_email_unread_rounded;
+    case 'انتهاك خصوصية':
+      return Icons.privacy_tip_rounded;
+    case 'أخرى':
+      return Icons.more_horiz_rounded;
+    default:
+      return Icons.category_rounded;
+  }
+}
 
   // ✅ حقل درجة الخطورة البارز
   Widget _buildSeverityField() {
@@ -1191,7 +1458,7 @@ class _ReportScreenState extends ConsumerState<ReportScreen> with SingleTickerPr
                 child: Text(
                   report.category,
                   style: theme.textTheme.labelSmall?.copyWith(
-                    color: theme.colorScheme.onSecondaryContainer,
+                    color: theme.colorScheme.onSurface,
                   ),
                 ),
               ),
@@ -1277,7 +1544,7 @@ class _ReportScreenState extends ConsumerState<ReportScreen> with SingleTickerPr
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      backgroundColor: Colors.transparent,
+      backgroundColor: const Color.fromARGB(0, 207, 104, 104),
       builder: (context) => Container(
         padding: const EdgeInsets.all(24),
         decoration: BoxDecoration(
