@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:safeclik/core/network/api_client.dart';
@@ -378,6 +378,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
               _buildRememberMeAndForgotPassword(context),
               const SizedBox(height: 24),
               _buildLoginButton(context),
+              const SizedBox(height: 24),
+              _buildDivider(context),
+              const SizedBox(height: 24),
+              _buildGoogleButton(context),
             ],
           ),
         ),
@@ -668,6 +672,80 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                     Icon(Icons.arrow_forward_rounded, size: 20),
                   ],
                 ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDivider(BuildContext context) {
+    return Row(
+      children: [
+        Expanded(child: Divider(color: Theme.of(context).colorScheme.outlineVariant)),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          child: Text(
+            'أو',
+            style: TextStyle(
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ),
+        Expanded(child: Divider(color: Theme.of(context).colorScheme.outlineVariant)),
+      ],
+    );
+  }
+
+  Widget _buildGoogleButton(BuildContext context) {
+    final authState = ref.watch(authProvider);
+    final isSubmitting = authState.isLoading;
+
+    return SizedBox(
+      height: 56,
+      child: OutlinedButton(
+        // استخدام same logic كما في login button
+        onPressed: isSubmitting ? null : () async {
+          final notifier = ref.read(authProvider.notifier);
+          final success = await notifier.continueWithGoogle();
+          if (success) {
+            if (!context.mounted) return;
+            Navigator.of(context).pushAndRemoveUntil(
+              MaterialPageRoute(builder: (context) => const HomeScreen()),
+              (route) => false,
+            );
+          } else if (notifier.error != null) {
+            if (!context.mounted) return;
+            _showErrorSnackBar(context, notifier.error!);
+          }
+        },
+        style: OutlinedButton.styleFrom(
+          side: BorderSide(color: Theme.of(context).colorScheme.outlineVariant),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            // أيقونة جوجل بسيطة (يمكن استخدام صورة إذا توفرت، سنستخدم أيقونة ملونة إذا أمكن أو نص)
+            Text(
+              'G',
+              style: TextStyle(
+                fontSize: 24,
+                fontWeight: FontWeight.bold,
+                color: Theme.of(context).colorScheme.primary,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Text(
+              'المتابعة باستخدام Google',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+                color: Theme.of(context).colorScheme.onSurface,
+              ),
+            ),
+          ],
         ),
       ),
     );

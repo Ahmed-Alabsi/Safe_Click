@@ -1,6 +1,7 @@
 // main.dart
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:app_links/app_links.dart';
@@ -24,6 +25,7 @@ import 'package:safeclik/features/main/presentation/pages/home_screen.dart';
 import 'package:safeclik/features/main/presentation/pages/main_screen.dart';
 import 'package:safeclik/features/scan/presentation/pages/result_screen.dart';
 import 'package:safeclik/features/scan/presentation/pages/history_screen.dart';
+import 'package:safeclik/features/scan/presentation/widgets/link_shield_dialog.dart';
 import 'package:safeclik/features/profile/presentation/pages/profile_screen.dart';
 import 'package:safeclik/features/profile/presentation/pages/edit_profile_screen.dart';
 import 'package:safeclik/features/report/presentation/pages/report_screen.dart';
@@ -148,8 +150,109 @@ class _MyAppState extends ConsumerState<MyApp> {
     super.initState();
     _initDeepLinks();
     _listenToNotifications();
-    
     _initializeApp();
+    _checkLinkInterceptionPermission();
+  }
+
+  // 🛡️ فحص صلاحية اعتراض الروابط (مرة واحدة فقط)
+  Future<void> _checkLinkInterceptionPermission() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final alreadyPrompted = prefs.getBool('link_interception_prompted') ?? false;
+      
+      if (alreadyPrompted) return;
+      
+      // انتظر حتى يظهر التطبيق بعد splash
+      await Future.delayed(const Duration(seconds: 3));
+      
+      if (!mounted) return;
+      
+      const platform = MethodChannel('com.example.safecli/app');
+      
+      // تحقق إذا كان التطبيق بالفعل هو المعالج الافتراضي
+      final isDefault = await platform.invokeMethod<bool>('isDefaultLinkHandler') ?? false;
+      if (isDefault) {
+        await prefs.setBool('link_interception_prompted', true);
+        return;
+      }
+      
+      // اعرض الحوار
+      if (!mounted) return;
+      
+      final contextRef = context;
+      if (!contextRef.mounted) return;
+      
+      final theme = Theme.of(contextRef);
+      
+      await showDialog(
+        context: contextRef,
+        builder: (ctx) => Dialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 72,
+                  height: 72,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: theme.colorScheme.primary.withValues(alpha: 0.15),
+                  ),
+                  child: Icon(Icons.shield_rounded, size: 40, color: theme.colorScheme.primary),
+                ),
+                const SizedBox(height: 16),
+                const Text(
+                  '🛡️ حماية الروابط',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  'هل تريد تفعيل اعتراض الروابط تلقائياً؟\n\n'
+                  'سيقوم SafeClick بفحص كل رابط تضغط عليه في أي تطبيق (واتساب، جيميل، إنستجرام...) وحمايتك من الروابط الخبيثة.',
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: theme.colorScheme.onSurfaceVariant,
+                    height: 1.5,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 20),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton.icon(
+                    onPressed: () async {
+                      try {
+                        await platform.invokeMethod('openDefaultAppsSettings');
+                      } catch (e) {
+                        debugPrint('❌ خطأ: $e');
+                      }
+                      if (ctx.mounted) Navigator.pop(ctx);
+                    },
+                    icon: const Icon(Icons.check_circle, size: 18),
+                    label: const Text('تفعيل الآن'),
+                    style: ElevatedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 10),
+                TextButton(
+                  onPressed: () => Navigator.pop(ctx),
+                  child: const Text('لاحقاً'),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+      
+      await prefs.setBool('link_interception_prompted', true);
+    } catch (e) {
+      debugPrint('❌ خطأ في فحص صلاحيات الروابط: $e');
+    }
   }
 
   // ✅ الاستماع للإشعارات الواردة
@@ -241,7 +344,7 @@ class _MyAppState extends ConsumerState<MyApp> {
 
     final link = _pendingLink!;
     final authState = ref.read(authProvider);
-    if (!authState.isAuthenticated) return;
+    if (!authState.isAuthenticated && !authState.isGuest) return;
 
     _processingDeepLink = true;
     _pendingLink = null;
@@ -251,37 +354,12 @@ class _MyAppState extends ConsumerState<MyApp> {
       return;
     }
 
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => const Center(child: CircularProgressIndicator()),
+    // 🛡️ عرض حوار الدرع الذكي (فحص → نتيجة → إجراء تلقائي)
+    await LinkShieldDialog.show(
+      context,
+      link: link,
+      onScan: (url) => ref.read(scanNotifierProvider.notifier).scanLink(url),
     );
-
-    final result = await ref.read(scanNotifierProvider.notifier).scanLink(link);
-
-    if (!context.mounted) {
-      _processingDeepLink = false;
-      return;
-    }
-
-    Navigator.pop(context);
-
-    if (result != null) {
-      Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (context) => ResultScreen(scanResult: result),
-        ),
-      );
-    } else {
-      final errorMsg = ref.read(scanNotifierProvider).lastError ?? 'فشل فحص الرابط';
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(errorMsg),
-          backgroundColor: Theme.of(context).colorScheme.error,
-        ),
-      );
-    }
 
     _processingDeepLink = false;
   }
@@ -308,6 +386,14 @@ class _MyAppState extends ConsumerState<MyApp> {
   builder: (context, ref, child) {
     final authState = ref.watch(authProvider);
 
+    // 🛡️ إذا فُتح التطبيق عبر رابط، نتخطى splash ونعرض الدرع بسرعة
+    if (_showSplash && _pendingLink != null) {
+      // تخطي splash عند فتح رابط لأسرع استجابة
+      if (!authState.isInitializing) {
+        _showSplash = false;
+      }
+    }
+
     if (_showSplash) {
       return const SplashScreen();
     }
@@ -319,7 +405,8 @@ class _MyAppState extends ConsumerState<MyApp> {
     }
 
     if (authState.isAuthenticated || authState.isGuest) {
-      if (_pendingLink != null) {
+      // معالجة الرابط المعلق فوق الشاشة الرئيسية
+      if (_pendingLink != null && !_processingDeepLink) {
         WidgetsBinding.instance.addPostFrameCallback((_) {
           _handlePendingLink(context);
         });
