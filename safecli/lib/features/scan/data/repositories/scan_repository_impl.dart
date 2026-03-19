@@ -44,7 +44,7 @@ class ScanRepositoryImpl implements ScanRepository {
   }
 
   @override
-  Future<ScanEntity?> scanLink(String link) async {
+  Future<ScanEntity?> scanLink(String link, {String scanLevel = 'deep'}) async {
     link = link.trim();
     if (link.isEmpty) throw Exception('الرجاء إدخال رابط للفحص');
 
@@ -95,9 +95,9 @@ class ScanRepositoryImpl implements ScanRepository {
     }
 
     // ── 2. Cache MISS → call backend ─────────────────────────────────────────
-    debugPrint('🌐 [API] Calling SafeClick backend for $link');
+    debugPrint('🌐 [API] Calling SafeClick backend for $link with level: $scanLevel');
     try {
-      final response = await _remote.scanLink(link);
+      final response = await _remote.scanLink(link, scanLevel: scanLevel);
 
       if (response['success'] == true && response['result'] != null) {
         final resultData = response['result'];
@@ -180,6 +180,7 @@ class ScanRepositoryImpl implements ScanRepository {
     }
   }
 
+  @override
   Future<bool> softDeleteScan(String id) async {
     try {
       await _cache.softDeleteScan(id);

@@ -1,4 +1,4 @@
-﻿import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:safeclik/features/settings/data/models/settings_model.dart';
 import 'package:flutter/foundation.dart';
@@ -29,8 +29,7 @@ class SettingsNotifier extends AsyncNotifier<SettingsModel> {
         darkMode: prefs.getBool('darkMode') ?? false,
         autoUpdate: prefs.getBool('autoUpdate') ?? true,
         saveHistory: prefs.getBool('saveHistory') ?? true,
-        scanTimeout: prefs.getInt('scanTimeout') ?? 30,
-        scanLevel: prefs.getString('scanLevel') ?? 'standard',
+        scanLevel: prefs.getString('scanLevel') ?? 'basic',
       );
     } catch (e) {
       debugPrint('خطأ في تحميل الإعدادات: $e');
@@ -49,7 +48,6 @@ class SettingsNotifier extends AsyncNotifier<SettingsModel> {
       await prefs.setBool('darkMode', newSettings.darkMode);
       await prefs.setBool('autoUpdate', newSettings.autoUpdate);
       await prefs.setBool('saveHistory', newSettings.saveHistory);
-      await prefs.setInt('scanTimeout', newSettings.scanTimeout);
       await prefs.setString('scanLevel', newSettings.scanLevel);
     } catch (e) {
       debugPrint('خطأ في حفظ الإعدادات: $e');
@@ -250,12 +248,6 @@ class SettingsNotifier extends AsyncNotifier<SettingsModel> {
   Future<void> toggleSaveHistory(bool value) async {
     if (state.value == null) return;
     final newSettings = state.value!.copyWith(saveHistory: value);
-    await updateSettings(newSettings);
-  }
-
-  Future<void> setScanTimeout(int seconds) async {
-    if (state.value == null) return;
-    final newSettings = state.value!.copyWith(scanTimeout: seconds);
     await updateSettings(newSettings);
   }
 

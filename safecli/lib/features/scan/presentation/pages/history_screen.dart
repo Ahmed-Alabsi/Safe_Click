@@ -1,4 +1,3 @@
-import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:safeclik/features/scan/presentation/controllers/scan_notifier.dart';
@@ -21,11 +20,9 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> with SingleTicker
 
   // 🗑️ متغيرات للتراجع عن الحذف الفردي
   ScanResult? _lastDeletedScan;
-  Timer? _undoTimer;
 
   // 🗑️ متغيرات للتراجع عن حذف الكل
   List<ScanResult>? _lastDeletedAllScans;
-  Timer? _undoAllTimer;
 
   @override
   void initState() {
@@ -50,8 +47,6 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> with SingleTicker
     _tabController.removeListener(_handleTabSelection);
     _tabController.dispose();
     _searchController.dispose();
-    _undoTimer?.cancel();
-    _undoAllTimer?.cancel();
     super.dispose();
   }
 
@@ -90,144 +85,48 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> with SingleTicker
     if (_lastDeletedScan == null) return;
     
     try {
-      ref.read(scanNotifierProvider.notifier).addScanResult(_lastDeletedScan!);
+      final scanToRestore = _lastDeletedScan!;
+      // Restore locally
+      ref.read(scanNotifierProvider.notifier).addScanResult(scanToRestore);
+      
+      // Background sync restore
+      ref.read(scanNotifierProvider.notifier).restoreScanResult(scanToRestore.id);
       
       ScaffoldMessenger.of(context).clearSnackBars();
       
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(4),
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.2),
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(Icons.undo, color: Colors.white, size: 16),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Text(
-                      'تم التراجع عن الحذف',
-                      style: TextStyle(fontWeight: FontWeight.bold),
-                    ),
-                    Text(
-                      _lastDeletedScan!.link.length > 40 
-                          ? '${_lastDeletedScan!.link.substring(0, 40)}...' 
-                          : _lastDeletedScan!.link,
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: Colors.white.withValues(alpha: 0.9),
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          backgroundColor: Colors.blue,
-          behavior: SnackBarBehavior.floating,
-          duration: const Duration(seconds: 3),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        ),
-      );
-      
       _lastDeletedScan = null;
-      _undoTimer?.cancel();
-      
     } catch (e) {
+      if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Row(
-            children: [
-              const Icon(Icons.error_outline, color: Colors.white),
-              const SizedBox(width: 12),
-              Expanded(child: Text('فشل التراجع عن الحذف: $e')),
-            ],
-          ),
+          content: Text('حدث خطأ أثناء التراجع: $e'),
           backgroundColor: Colors.red,
-          behavior: SnackBarBehavior.floating,
-          duration: const Duration(seconds: 3),
         ),
       );
     }
   }
 
-  // 🔄 دالة التراجع عن حذف الكل
+  // 🔄 دالة التراجع عن مسح السجل
   void _undoDeleteAll() {
-    if (_lastDeletedAllScans == null || _lastDeletedAllScans!.isEmpty) return;
+    if (_lastDeletedAllScans == null) return;
     
     try {
-      for (var scan in _lastDeletedAllScans!) {
-        ref.read(scanNotifierProvider.notifier).addScanResult(scan);
-      }
+      // Restore locally
+      ref.read(scanNotifierProvider.notifier).addScansLocally(_lastDeletedAllScans!);
+      
+      // Background sync restore
+      final ids = _lastDeletedAllScans!.map((s) => s.id).toList();
+      ref.read(scanNotifierProvider.notifier).restoreScansBulk(ids);
       
       ScaffoldMessenger.of(context).clearSnackBars();
       
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(4),
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.2),
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(Icons.undo, color: Colors.white, size: 16),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Text(
-                      'تم التراجع عن حذف الكل',
-                      style: TextStyle(fontWeight: FontWeight.bold),
-                    ),
-                    Text(
-                      'تم استعادة ${_lastDeletedAllScans!.length} فحص',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: Colors.white.withValues(alpha: 0.9),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          backgroundColor: Colors.blue,
-          behavior: SnackBarBehavior.floating,
-          duration: const Duration(seconds: 3),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        ),
-      );
-      
       _lastDeletedAllScans = null;
-      _undoAllTimer?.cancel();
-      
     } catch (e) {
+      if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Row(
-            children: [
-              const Icon(Icons.error_outline, color: Colors.white),
-              const SizedBox(width: 12),
-              Expanded(child: Text('فشل التراجع عن الحذف: $e')),
-            ],
-          ),
+          content: Text('حدث خطأ أثناء التراجع: $e'),
           backgroundColor: Colors.red,
-          behavior: SnackBarBehavior.floating,
-          duration: const Duration(seconds: 3),
         ),
       );
     }
@@ -1029,9 +928,13 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> with SingleTicker
 
     if (shouldDelete == true) {
       try {
-        _undoTimer?.cancel();
         _lastDeletedScan = scan;
-        await ref.read(scanNotifierProvider.notifier).softDeleteScanResult(scan.id);
+        
+        // 1. Optimistic update
+        ref.read(scanNotifierProvider.notifier).removeScanLocally(scan.id);
+        
+        // 2. Background sync
+        ref.read(scanNotifierProvider.notifier).softDeleteScanResult(scan.id);
         
         if (!context.mounted) return;
         
@@ -1071,13 +974,6 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> with SingleTicker
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
-                      Text(
-                        'سيتم إغلاق هذه الرسالة بعد 5 ثواني',
-                        style: TextStyle(
-                          fontSize: 10,
-                          color: Colors.white.withValues(alpha: 0.7),
-                        ),
-                      ),
                     ],
                   ),
                 ),
@@ -1085,7 +981,7 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> with SingleTicker
             ),
             backgroundColor: Colors.green,
             behavior: SnackBarBehavior.floating,
-            duration: const Duration(seconds: 5),
+            duration: const Duration(seconds: 4),
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
             action: SnackBarAction(
               label: 'تراجع',
@@ -1094,15 +990,6 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> with SingleTicker
             ),
           ),
         );
-        
-        _undoTimer = Timer(const Duration(seconds: 5), () {
-          if (mounted) {
-            setState(() {
-              _lastDeletedScan = null;
-            });
-          }
-        });
-        
       } catch (e) {
         if (!context.mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
@@ -1188,10 +1075,14 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> with SingleTicker
 
     if (shouldClear == true) {
       try {
-        _undoAllTimer?.cancel();
         _lastDeletedAllScans = List.from(scanHistory);
-        await ref.read(scanNotifierProvider.notifier).clearUserHistory();
+        
+        // 1. Optimistic update
+        ref.read(scanNotifierProvider.notifier).clearHistoryLocally();
         _stopSearch();
+        
+        // 2. Background sync
+        ref.read(scanNotifierProvider.notifier).clearUserHistory();
         
         if (!context.mounted) return;
         
@@ -1225,13 +1116,6 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> with SingleTicker
                           color: Colors.white.withValues(alpha: 0.9),
                         ),
                       ),
-                      Text(
-                        'سيتم إغلاق هذه الرسالة بعد 5 ثواني',
-                        style: TextStyle(
-                          fontSize: 10,
-                          color: Colors.white.withValues(alpha: 0.7),
-                        ),
-                      ),
                     ],
                   ),
                 ),
@@ -1239,7 +1123,7 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> with SingleTicker
             ),
             backgroundColor: Colors.orange,
             behavior: SnackBarBehavior.floating,
-            duration: const Duration(seconds: 5),
+            duration: const Duration(seconds: 4),
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
             action: SnackBarAction(
               label: 'تراجع',
@@ -1248,15 +1132,6 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> with SingleTicker
             ),
           ),
         );
-        
-        _undoAllTimer = Timer(const Duration(seconds: 5), () {
-          if (mounted) {
-            setState(() {
-              _lastDeletedAllScans = null;
-            });
-          }
-        });
-        
       } catch (e) {
         if (!context.mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(

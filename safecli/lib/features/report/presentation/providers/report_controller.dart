@@ -1,8 +1,9 @@
-﻿import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:safeclik/core/network/report_api.dart';
 import 'package:safeclik/features/report/data/models/report_model.dart';
 import 'package:safeclik/features/auth/presentation/providers/auth_controller.dart';
 import 'package:safeclik/core/di/di.dart';
+import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 
 final reportProvider = AsyncNotifierProvider<ReportNotifier, List<ReportModel>>(
@@ -90,34 +91,30 @@ class ReportNotifier extends AsyncNotifier<List<ReportModel>> {
   Future<bool> deleteReport(String reportId) async {
     try {
       debugPrint('🔵 حذف بلاغ: $reportId');
-      
       final response = await _reportApi.deleteReport(reportId);
-      
       if (response['success'] == true) {
-        // تحديث القائمة بعد الحذف الناجح
-        final updatedReports = await _fetchMyReports();
-        state = AsyncValue.data(updatedReports);
         return true;
       } else {
         _lastError = response['message'] ?? 'فشل حذف البلاغ';
         return false;
       }
     } catch (e) {
-      debugPrint('❌ خطأ في حذف البلاغ: $e');
       _lastError = 'حدث خطأ في الاتصال بالخادم';
       return false;
     }
+  }
+
+  // ⚠️ [DEPRECATED] استخدم restoreReportsBulk بدلاً منها
+  Future<bool> restoreReport(String reportId) async {
+    return restoreReportsBulk([reportId]);
   }
 
   // ✅ دالة حذف جميع البلاغات
   Future<bool> clearAllReports() async {
     try {
       debugPrint('🔵 حذف جميع البلاغات');
-      
       final response = await _reportApi.deleteAllReports();
-      
       if (response['success'] == true) {
-        state = const AsyncValue.data([]);
         return true;
       } else {
         _lastError = response['message'] ?? 'فشل حذف جميع البلاغات';
@@ -125,6 +122,25 @@ class ReportNotifier extends AsyncNotifier<List<ReportModel>> {
       }
     } catch (e) {
       debugPrint('❌ خطأ في حذف جميع البلاغات: $e');
+      _lastError = 'حدث خطأ في الاتصال بالخادم';
+      return false;
+    }
+  }
+
+  // ✅ دالة استعادة قائمة من البلاغات
+  Future<bool> restoreReportsBulk(List<String> ids) async {
+    if (ids.isEmpty) return true;
+    try {
+      debugPrint('🔄 استعادة البلاغات بالمعرفات: ${ids.length}');
+      final response = await _reportApi.restoreReportsBulk(ids);
+      if (response['success'] == true) {
+        return true;
+      } else {
+        _lastError = response['message'] ?? 'فشل استعادة البلاغات';
+        return false;
+      }
+    } catch (e) {
+      debugPrint('❌ خطأ في استعادة البلاغات: $e');
       _lastError = 'حدث خطأ في الاتصال بالخادم';
       return false;
     }
@@ -178,11 +194,20 @@ void deleteReportLocally(String reportId) {
 // ✅ إضافة بلاغ محلياً (للتراجع)
 void addReportLocally(ReportModel report) {
   final currentList = state.value ?? [];
-  // التأكد من عدم وجود تكرار
   if (!currentList.any((r) => r.id == report.id)) {
     final updatedList = [report, ...currentList];
+    updatedList.sort((a, b) => b.reportDate.compareTo(a.reportDate));
     state = AsyncValue.data(updatedList);
   }
+}
+
+void addReportsLocally(List<ReportModel> reports) {
+  final currentList = state.value ?? [];
+  final newIds = reports.map((r) => r.id).toSet();
+  final filteredList = currentList.where((r) => !newIds.contains(r.id)).toList();
+  final updatedList = [...reports, ...filteredList];
+  updatedList.sort((a, b) => b.reportDate.compareTo(a.reportDate));
+  state = AsyncValue.data(updatedList);
 }
 
 // ✅ حذف جميع البلاغات محلياً (بدون API)

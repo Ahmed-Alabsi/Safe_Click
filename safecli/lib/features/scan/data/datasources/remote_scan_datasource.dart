@@ -9,8 +9,8 @@ class RemoteScanDataSource {
   final ScanApi _scanApi;
   RemoteScanDataSource(this._scanApi);
 
-  Future<Map<String, dynamic>> scanLink(String link) =>
-      _scanApi.scanLink(link);
+  Future<Map<String, dynamic>> scanLink(String link, {String scanLevel = 'deep'}) =>
+      _scanApi.scanLink(link, scanLevel: scanLevel);
 
   Future<Map<String, dynamic>> getScanHistory() =>
       _scanApi.getScanHistory();

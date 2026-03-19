@@ -7,5 +7,5 @@ class ScanLinkUseCase {
   final ScanRepository _repository;
   ScanLinkUseCase(this._repository);
 
-  Future<ScanEntity?> call(String link) => _repository.scanLink(link);
+  Future<ScanEntity?> call(String link, {String scanLevel = 'deep'}) => _repository.scanLink(link, scanLevel: scanLevel);
 }

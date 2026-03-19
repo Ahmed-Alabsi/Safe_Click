@@ -4,7 +4,7 @@ import '../entities/scan_entity.dart';
 
 abstract class ScanRepository {
   /// Scan a URL. Returns a [ScanEntity] or null on unrecoverable failure.
-  Future<ScanEntity?> scanLink(String link);
+  Future<ScanEntity?> scanLink(String link, {String scanLevel = 'deep'});
 
   /// Fetch scan history for current user (excludes soft-deleted items)
   Future<List<ScanEntity>> getScanHistory(String? userId);

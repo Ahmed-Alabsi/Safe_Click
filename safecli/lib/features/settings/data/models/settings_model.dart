@@ -1,4 +1,4 @@
-﻿class SettingsModel {
+class SettingsModel {
   bool autoScan;
   bool notifications;
   bool deepLinks;
@@ -7,7 +7,6 @@
   bool darkMode;
   bool autoUpdate;
   bool saveHistory;
-  int scanTimeout;
   String scanLevel; // 'basic', 'standard', 'deep'
 
   SettingsModel({
@@ -19,8 +18,7 @@
     this.darkMode = false,
     this.autoUpdate = true,
     this.saveHistory = true,
-    this.scanTimeout = 30,
-    this.scanLevel = 'standard',
+    this.scanLevel = 'basic',
   });
 
   Map<String, dynamic> toJson() => {
@@ -32,7 +30,6 @@
         'darkMode': darkMode,
         'autoUpdate': autoUpdate,
         'saveHistory': saveHistory,
-        'scanTimeout': scanTimeout,
         'scanLevel': scanLevel,
       };
 
@@ -45,8 +42,7 @@
         darkMode: json['darkMode'] ?? false,
         autoUpdate: json['autoUpdate'] ?? true,
         saveHistory: json['saveHistory'] ?? true,
-        scanTimeout: json['scanTimeout'] ?? 30,
-        scanLevel: json['scanLevel'] ?? 'standard',
+        scanLevel: json['scanLevel'] ?? 'basic',
       );
 
   SettingsModel copyWith({
@@ -58,7 +54,6 @@
     bool? darkMode,
     bool? autoUpdate,
     bool? saveHistory,
-    int? scanTimeout,
     String? scanLevel,
   }) {
     return SettingsModel(
@@ -70,7 +65,6 @@
       darkMode: darkMode ?? this.darkMode,
       autoUpdate: autoUpdate ?? this.autoUpdate,
       saveHistory: saveHistory ?? this.saveHistory,
-      scanTimeout: scanTimeout ?? this.scanTimeout,
       scanLevel: scanLevel ?? this.scanLevel,
     );
   }

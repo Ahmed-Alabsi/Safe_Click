@@ -4,6 +4,7 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:safeclik/features/auth/presentation/providers/auth_controller.dart';
+import 'package:safeclik/features/settings/presentation/providers/settings_controller.dart';
 
 import 'package:safeclik/features/scan/data/models/scan_result.dart';
 import 'package:safeclik/features/scan/domain/entities/scan_entity.dart';
@@ -15,6 +16,7 @@ import 'package:safeclik/features/scan/domain/usecases/save_history_usecase.dart
 import 'package:safeclik/features/scan/domain/usecases/scan_link_usecase.dart';
 import 'package:safeclik/core/di/di.dart';
 import 'package:safeclik/features/scan/data/repositories/scan_repository_impl.dart';
+import 'package:safeclik/core/network/scan_api.dart';
 import 'scan_state.dart';
 
 final scanNotifierProvider = StateNotifierProvider<ScanNotifier, ScanState>(
@@ -152,11 +154,13 @@ class ScanNotifier extends StateNotifier<ScanState> {
 
   final authState = _ref.read(authProvider);
   final isGuest = authState.isGuest;
+  final settingsState = _ref.read(settingsProvider);
+  final scanLevel = settingsState.value?.scanLevel ?? 'deep';
 
   try {
     state = state.copyWith(isScanning: true, lastError: null);
 
-    final entity = await _scanLinkUseCase(link);
+    final entity = await _scanLinkUseCase(link, scanLevel: scanLevel);
 
     if (entity == null) throw Exception('تعذر فحص الرابط');
 
@@ -254,78 +258,97 @@ class ScanNotifier extends StateNotifier<ScanState> {
   }
 
 
-Future<void> softDeleteScanResult(String id) async {
-    debugPrint('🗑️ [SoftDelete] Starting for ID: $id');
-    state = state.copyWith(isLoading: true);
-    
+  void removeScanLocally(String id) {
+    final newHistory = state.scanHistory.where((s) => s.id != id).toList();
+    state = state.copyWith(
+      scanHistory: newHistory,
+      dangerousScans: _countDangerous(newHistory),
+    );
+  }
+
+  void clearHistoryLocally() {
+    state = state.copyWith(
+      scanHistory: [],
+      dangerousScans: 0,
+    );
+  }
+
+  Future<void> softDeleteScanResult(String id) async {
+    debugPrint('🗑️ [SoftDelete] Executing delayed backend delete for ID: $id');
     try {
-      // Soft delete through repository
-      final success = await _deleteUseCase(id); // This now does soft delete
-      
+      final success = await _deleteUseCase(id);
       if (success) {
-        // Remove from local state
-        final newHistory = state.scanHistory.where((s) => s.id != id).toList();
-        
-        state = state.copyWith(
-          scanHistory: newHistory,
-          dangerousScans: _countDangerous(newHistory),
-          isLoading: false,
-        );
-        
-        debugPrint('✅ [SoftDelete] Successfully hid scan: $id');
-      } else {
-        state = state.copyWith(
-          isLoading: false,
-          lastError: 'فشل إخفاء الفحص',
-        );
+        debugPrint('✅ [SoftDelete] Successfully deleted scan on backend: $id');
       }
     } catch (e) {
       debugPrint('🔴 [SoftDelete] Error: $e');
-      state = state.copyWith(
-        isLoading: false,
-        lastError: 'حدث خطأ: $e',
-      );
     }
   }
 
+  Future<bool> restoreScanResult(String id) async {
+    debugPrint('🔄 [Restore] Executing background restore for ID: $id');
+    try {
+      final success = await sl<ScanApi>().restoreScan(id);
+      if (success['success'] == true) {
+        debugPrint('✅ [Restore] Successfully restored scan on backend: $id');
+        return true;
+      }
+    } catch (e) {
+      debugPrint('🔴 [Restore] Error: $e');
+    }
+    return false;
+  }
+
+  Future<bool> restoreScansBulk(List<String> ids) async {
+    if (ids.isEmpty) return true;
+    debugPrint('🔄 [RestoreBulk] Executing background restore for ${ids.length} scans...');
+    try {
+      final success = await sl<ScanApi>().restoreScansBulk(ids);
+      if (success['success'] == true) {
+        debugPrint('✅ [RestoreBulk] Successfully restored scans on backend');
+        return true;
+      }
+    } catch (e) {
+      debugPrint('🔴 [RestoreBulk] Error: $e');
+    }
+    return false;
+  }
+
+
   Future<void> clearUserHistory() async {
     final userId = _ref.read(authProvider).user?.id;
-    debugPrint('🗑️ [SoftDelete] Clearing all history for user $userId...');
-    state = state.copyWith(isLoading: true);
+    debugPrint('🗑️ [SoftDelete] Executing background clear all history for user $userId...');
     
     try {
-      final success = await _clearUseCase(userId); // This now does soft delete for all
-      
+      final success = await _clearUseCase(userId); 
       if (success) {
-        state = state.copyWith(
-          scanHistory: [],
-          dangerousScans: 0,
-          isLoading: false,
-          lastError: null,
-        );
-        debugPrint('✅ [SoftDelete] All scans hidden from user');
-      } else {
-        state = state.copyWith(
-          isLoading: false,
-          lastError: 'فشل إخفاء السجل',
-        );
+        debugPrint('✅ [SoftDelete] All scans hidden from user on backend');
       }
     } catch (e) {
       debugPrint('🔴 [SoftDelete] Error: $e');
-      state = state.copyWith(
-        isLoading: false,
-        lastError: 'حدث خطأ: $e',
-      );
     }
   }
   
   void clearError() => state = state.copyWith(lastError: null);
 void addScanResult(ScanResult result) {
   if (!state.scanHistory.any((scan) => scan.id == result.id)) {
+    final newHistory = [result, ...state.scanHistory]..sort((a, b) => b.timestamp.compareTo(a.timestamp));
     state = state.copyWith(
-      scanHistory: [result, ...state.scanHistory],
+      scanHistory: newHistory,
+      dangerousScans: _countDangerous(newHistory),
     );
   }
+}
+
+void addScansLocally(List<ScanResult> scans) {
+  final currentList = state.scanHistory;
+  final newIds = scans.map((s) => s.id).toSet();
+  final filteredList = currentList.where((s) => !newIds.contains(s.id)).toList();
+  final newHistory = [...scans, ...filteredList]..sort((a, b) => b.timestamp.compareTo(a.timestamp));
+  state = state.copyWith(
+    scanHistory: newHistory,
+    dangerousScans: _countDangerous(newHistory),
+  );
 }
   void reset() {
     state = const ScanState();

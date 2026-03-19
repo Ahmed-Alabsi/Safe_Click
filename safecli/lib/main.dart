@@ -1,4 +1,4 @@
-﻿// main.dart
+// main.dart
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -126,8 +126,22 @@ class _MyAppState extends ConsumerState<MyApp> {
   // للإشعارات
   StreamSubscription<RemoteMessage>? _notificationSubscription;
   
-  // ✅ متغير للتحكم في مدة ظهور Splash Screen (5 ثواني)
+  // ✅ متغير للتحكم في مدة ظهور Splash Screen
   bool _showSplash = true;
+
+  Future<void> _initializeApp() async {
+    // ننتظر انتهاء الأنيميشن (2 ثانية) بالإضافة إلى أي بيانات أساسية إضافية إن وجدت
+    await Future.wait([
+      Future.delayed(const Duration(seconds: 2)),
+      // يمكن إضافة _loadInitialData() هنا
+    ]);
+
+    if (mounted) {
+      setState(() {
+        _showSplash = false;
+      });
+    }
+  }
 
   @override
   void initState() {
@@ -135,14 +149,7 @@ class _MyAppState extends ConsumerState<MyApp> {
     _initDeepLinks();
     _listenToNotifications();
     
-    // ✅ تأخير 5 ثواني ثم إخفاء الـ Splash
-    Future.delayed(const Duration(seconds: 5), () {
-      if (mounted) {
-        setState(() {
-          _showSplash = false;
-        });
-      }
-    });
+    _initializeApp();
   }
 
   // ✅ الاستماع للإشعارات الواردة

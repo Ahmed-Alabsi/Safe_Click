@@ -4,6 +4,7 @@ import 'package:safeclik/core/network/auth_api.dart';
 import 'package:safeclik/core/network/scan_api.dart';
 import 'package:safeclik/core/network/report_api.dart';
 import 'package:safeclik/core/network/settings_api.dart';
+import 'package:safeclik/core/network/feedback_api.dart';
 import 'package:safeclik/core/utils/local_storage_service.dart';
 import 'package:safeclik/core/utils/notification_service.dart';
 import 'package:safeclik/core/utils/scan_cache_service.dart';
@@ -57,4 +58,7 @@ Future<void> initDI() async {
   sl.registerLazySingleton<ClearHistoryUseCase>(
       () => ClearHistoryUseCase(sl()));
   sl.registerLazySingleton<SaveHistoryUseCase>(() => SaveHistoryUseCase(sl()));
+
+  // ── Feedback Feature ──────────────────────────────────────────────────────
+  sl.registerLazySingleton<FeedbackApi>(() => FeedbackApi(sl()));
 }

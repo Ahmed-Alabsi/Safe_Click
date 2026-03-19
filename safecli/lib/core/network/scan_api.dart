@@ -6,10 +6,10 @@ class ScanApi {
 
   ScanApi(this._client);
 
-  Future<Map<String, dynamic>> scanLink(String link) async {
+  Future<Map<String, dynamic>> scanLink(String link, {String scanLevel = 'deep'}) async {
     try {
-      final response = await _client.dio.post('/scans/scan/', data: {'link': link}, 
-      options: Options(receiveTimeout: const Duration(seconds: 30)));
+      final response = await _client.dio.post('/scans/scan/', data: {'link': link, 'scan_level': scanLevel}, 
+      options: Options(receiveTimeout: const Duration(seconds: 60)));
       return response.data;
     } catch (e) {
       return _client.handleDioError(e);
@@ -57,6 +57,27 @@ class ScanApi {
   Future<Map<String, dynamic>> getScanStats() async {
     try {
       final response = await _client.dio.get('/scans/stats/');
+      return response.data;
+    } catch (e) {
+      return _client.handleDioError(e);
+    }
+  }
+
+  Future<Map<String, dynamic>> restoreScan(String scanId) async {
+    try {
+      final response = await _client.dio.post('/scans/history/$scanId/restore/');
+      return response.data;
+    } catch (e) {
+      return _client.handleDioError(e);
+    }
+  }
+
+  Future<Map<String, dynamic>> restoreScansBulk(List<String> scanIds) async {
+    try {
+      final response = await _client.dio.post(
+        '/scans/history/restore-bulk/',
+        data: {'scan_ids': scanIds},
+      );
       return response.data;
     } catch (e) {
       return _client.handleDioError(e);

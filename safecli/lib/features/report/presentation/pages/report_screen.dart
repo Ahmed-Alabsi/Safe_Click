@@ -1,4 +1,4 @@
-﻿import 'dart:async';
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:safeclik/features/report/presentation/providers/report_controller.dart';
@@ -23,9 +23,10 @@ class _ReportScreenState extends ConsumerState<ReportScreen> with SingleTickerPr
   late AnimationController _animationController;
   bool _isSubmitting = false;
 
-  // 🗑️ متغيرات للتراجع عن الحذف
   ReportModel? _lastDeletedReport;
-  Timer? _undoTimer;
+
+  // 🗑️ متغيرات للتراجع عن الحذف الكل
+  List<ReportModel>? _lastDeletedAllReports;
 
   final List<String> _categories = [
     'تصيد احتيالي',
@@ -72,8 +73,59 @@ class _ReportScreenState extends ConsumerState<ReportScreen> with SingleTickerPr
     _linkFocusNode.dispose();
     _descriptionFocusNode.dispose();
     _animationController.dispose();
-    _undoTimer?.cancel();
     super.dispose();
+  }
+
+  // 🔄 دالة التراجع عن حذف بلاغ فردي
+  void _undoDeleteReport() {
+    if (_lastDeletedReport == null) return;
+    
+    try {
+      final reportToRestore = _lastDeletedReport!;
+      // Restore locally
+      ref.read(reportProvider.notifier).addReportLocally(reportToRestore);
+      
+      // Background sync restore
+      ref.read(reportProvider.notifier).restoreReportsBulk([reportToRestore.id]);
+      
+      ScaffoldMessenger.of(context).clearSnackBars();
+      
+      _lastDeletedReport = null;
+    } catch (e) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('حدث خطأ أثناء التراجع: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
+  // 🔄 دالة التراجع عن مسح جميع البلاغات
+  void _undoDeleteAllReports() {
+    if (_lastDeletedAllReports == null) return;
+    
+    try {
+      // Restore locally
+      ref.read(reportProvider.notifier).addReportsLocally(_lastDeletedAllReports!);
+      
+      // Background sync restore
+      final ids = _lastDeletedAllReports!.map((r) => r.id).toList();
+      ref.read(reportProvider.notifier).restoreReportsBulk(ids);
+      
+      ScaffoldMessenger.of(context).clearSnackBars();
+      
+      _lastDeletedAllReports = null;
+    } catch (e) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('حدث خطأ أثناء التراجع: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
   }
 
   @override
@@ -985,6 +1037,7 @@ IconData _getCategoryIcon(String category) {
   // ✅ زر الإرسال البارز
   Widget _buildSubmitButton() {
     final theme = Theme.of(context);
+    final isGuest = ref.watch(authProvider).isGuest;
 
     return Container(
       width: double.infinity,
@@ -1009,7 +1062,31 @@ IconData _getCategoryIcon(String category) {
         ],
       ),
       child: ElevatedButton(
-        onPressed: _isSubmitting ? null : _submitReport,
+        onPressed: _isSubmitting 
+            ? null 
+            : isGuest 
+                ? () {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: const Text(
+                          "يجب تسجيل الدخول للإبلاغ عن الروابط",
+                          style: TextStyle(fontFamily: 'Cairo'),
+                        ),
+                        action: SnackBarAction(
+                          label: "تسجيل الدخول",
+                          textColor: theme.colorScheme.primaryContainer,
+                          onPressed: () {
+                            Navigator.pushNamed(context, '/login');
+                          },
+                        ),
+                        behavior: SnackBarBehavior.floating,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                    );
+                  }
+                : _submitReport,
         style: ElevatedButton.styleFrom(
           backgroundColor: Colors.transparent,
           foregroundColor: Colors.white,
@@ -1287,7 +1364,7 @@ IconData _getCategoryIcon(String category) {
                         icon: Icon(Icons.delete_sweep_rounded, color: theme.colorScheme.error),
                         onPressed: () {
                           Navigator.pop(context);
-                          _confirmClearAllReports(context, reportNotifier);
+                          _confirmClearAllReports(reportNotifier);
                         },
                       ),
                     ),
@@ -1431,7 +1508,7 @@ IconData _getCategoryIcon(String category) {
                   icon: Icon(Icons.close_rounded, color: theme.colorScheme.error, size: 16),
                   onPressed: () {
                     Navigator.pop(context);
-                    _confirmDeleteReport(context, report, notifier);
+                    _confirmDeleteReport(report, notifier);
                   },
                   padding: EdgeInsets.zero,
                   constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
@@ -1690,7 +1767,7 @@ IconData _getCategoryIcon(String category) {
     );
   }
 
-  Future<void> _confirmDeleteReport(BuildContext context, ReportModel report, ReportNotifier notifier) async {
+  Future<void> _confirmDeleteReport(ReportModel report, ReportNotifier notifier) async {
     final shouldDelete = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
@@ -1731,8 +1808,12 @@ IconData _getCategoryIcon(String category) {
     if (shouldDelete == true) {
       try {
         _lastDeletedReport = report;
-        _undoTimer?.cancel();
+        
+        // 1. Optimistic update
         notifier.deleteReportLocally(report.id);
+        
+        // 2. Background sync
+        notifier.deleteReport(report.id);
         
         if (!context.mounted) return;
         
@@ -1755,25 +1836,15 @@ IconData _getCategoryIcon(String category) {
             ),
             backgroundColor: Colors.green,
             behavior: SnackBarBehavior.floating,
-            duration: const Duration(seconds: 3),
+            duration: const Duration(seconds: 4),
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
             action: SnackBarAction(
               label: 'تراجع',
               textColor: Colors.white,
-              onPressed: () {
-                if (_lastDeletedReport != null) {
-                  notifier.addReportLocally(_lastDeletedReport!);
-                  _lastDeletedReport = null;
-                  _undoTimer?.cancel();
-                }
-              },
+              onPressed: _undoDeleteReport,
             ),
           ),
         );
-        
-        _undoTimer = Timer(const Duration(seconds: 3), () {
-          if (mounted) setState(() => _lastDeletedReport = null);
-        });
         
       } catch (e) {
         if (!context.mounted) return;
@@ -1794,7 +1865,7 @@ IconData _getCategoryIcon(String category) {
     }
   }
 
-  Future<void> _confirmClearAllReports(BuildContext context, ReportNotifier notifier) async {
+  Future<void> _confirmClearAllReports(ReportNotifier notifier) async {
     final currentReports = ref.read(reportProvider).value ?? [];
     
     final shouldClear = await showDialog<bool>(
@@ -1861,7 +1932,13 @@ IconData _getCategoryIcon(String category) {
     if (shouldClear == true) {
       try {
         final deletedReports = List<ReportModel>.from(currentReports);
+        _lastDeletedAllReports = deletedReports;
+        
+        // 1. Optimistic update
         notifier.clearAllReportsLocally();
+        
+        // 2. Background sync
+        notifier.clearAllReports();
         
         if (!context.mounted) return;
         
@@ -1884,8 +1961,13 @@ IconData _getCategoryIcon(String category) {
             ),
             backgroundColor: Colors.orange,
             behavior: SnackBarBehavior.floating,
-            duration: const Duration(seconds: 3),
+            duration: const Duration(seconds: 4),
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            action: SnackBarAction(
+              label: 'تراجع',
+              textColor: Colors.white,
+              onPressed: _undoDeleteAllReports,
+            ),
           ),
         );
         

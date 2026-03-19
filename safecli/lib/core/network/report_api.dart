@@ -75,6 +75,29 @@ class ReportApi {
     }
   }
 
+  // ✅ دالة استعادة بلاغ (Undo Soft Delete)
+  Future<Map<String, dynamic>> restoreReport(String reportId) async {
+    try {
+      final response = await _client.dio.post('/reports/$reportId/restore/');
+      return response.data;
+    } catch (e) {
+      return _client.handleDioError(e);
+    }
+  }
+
+  // ✅ دالة استعادة قائمة من البلاغات (Undo Delete Bulk)
+  Future<Map<String, dynamic>> restoreReportsBulk(List<String> reportIds) async {
+    try {
+      final response = await _client.dio.post(
+        '/reports/restore-bulk-soft/',
+        data: {'report_ids': reportIds},
+      );
+      return response.data;
+    } catch (e) {
+      return _client.handleDioError(e);
+    }
+  }
+
   // ✅ دالة حذف بلاغ فردي (نسخة مع محاكاة للاختبار - اختيارية)
   Future<Map<String, dynamic>> deleteReportMock(String reportId) async {
     // محاكاة نجاح العملية للاختبار بدون الاتصال بالخادم
