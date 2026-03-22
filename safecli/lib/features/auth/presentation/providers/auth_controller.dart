@@ -1,8 +1,9 @@
-﻿import 'dart:async';
+import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 import 'package:safeclik/features/auth/data/models/user_model.dart';
 import 'package:safeclik/features/auth/presentation/providers/auth_state.dart';
 import 'package:safeclik/core/network/api_client.dart';
@@ -15,6 +16,8 @@ export 'auth_state.dart';
 const _kAccessToken = 'access_token';
 const _kRefreshToken = 'refresh_token';
 const _kCachedUser = 'cached_user_data';
+const _kGuestScansCount = 'guest_scans_count';
+const _kIsGuest = 'is_guest';
 
 final _secureStorage = const FlutterSecureStorage(
   aOptions: AndroidOptions(encryptedSharedPreferences: true),
@@ -41,7 +44,15 @@ class AuthNotifier extends StateNotifier<AuthState> {
 }
 
   Future<void> _loadSavedUser() async {
+    int guestScans = 0;
+    bool isGuest = false;
     try {
+      final guestScansStr = await _secureStorage.read(key: _kGuestScansCount);
+      guestScans = int.tryParse(guestScansStr ?? '0') ?? 0;
+      
+      final isGuestStr = await _secureStorage.read(key: _kIsGuest);
+      isGuest = isGuestStr == 'true';
+      
       final token = await _secureStorage.read(key: _kAccessToken);
       final cachedUserData = await _secureStorage.read(key: _kCachedUser);
       
@@ -62,6 +73,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
           isInitializing: false,
           hasToken: true,
           user: cachedUser,
+          guestScansCount: guestScans,
         );
         
         // محاولة جلب بيانات المستخدم في الخلفية لتحديث الكاش
@@ -73,7 +85,16 @@ class AuthNotifier extends StateNotifier<AuthState> {
       debugPrint('❌ AuthNotifier._loadSavedUser error: $e');
     }
     
-    state = state.copyWith(isInitializing: false, hasToken: false);
+    state = state.copyWith(
+      isInitializing: false, 
+      hasToken: false,
+      isGuest: isGuest,
+      guestScansCount: guestScans,
+    );
+    
+    if (isGuest) {
+      debugPrint('👤 تم استعادة جلسة الزائر (فحوصات: $guestScans)');
+    }
   }
 
   // حفظ بيانات المستخدم في التخزين الآمن
@@ -89,7 +110,12 @@ class AuthNotifier extends StateNotifier<AuthState> {
     }
   }
 
-// جلب بيانات المستخدم في الخلفية (اختياري)
+// جلب بيانات المستخدم وتحديث الكاش
+Future<void> refreshProfile() async {
+  await _fetchUserProfileInBackground();
+}
+
+// جلب بيانات المستخدم في الخلفية
 Future<void> _fetchUserProfileInBackground() async {
   try {
     final response = await _authApi.getProfile();
@@ -105,7 +131,7 @@ Future<void> _fetchUserProfileInBackground() async {
     }
   } catch (e) {
     // إذا فشل جلب البيانات، نبقى على hasToken = true
-    debugPrint('⚠️ فشل جلب بيانات المستخدم في الخلفية: $e');
+    debugPrint('⚠️ فشل جلب بيانات المستخدم: $e');
   }
 }
 
@@ -113,6 +139,7 @@ Future<void> _fetchUserProfileInBackground() async {
   Future<void> _clearTokens() async {
     await sl<ApiClient>().clearTokens();
     await _secureStorage.delete(key: _kCachedUser);
+    await _secureStorage.delete(key: _kIsGuest);
     state = state.copyWith(clearUser: true, clearError: true, isInitializing: false);
     debugPrint('🗑️ تم مسح التوكنات وبيانات الكاش');
   }
@@ -290,6 +317,8 @@ Future<void> _fetchUserProfileInBackground() async {
 
   Future<void> logout() async {
     try {
+      // تسجيل الخروج من Google إذا كان مسجلاً
+      await GoogleSignIn().signOut().catchError((_) => null);
       await _authApi.logout().catchError((_) => <String, dynamic>{});
     } finally {
       await _clearTokens(); // هذه الدالة تمسح التوكنات من التخزين
@@ -351,9 +380,75 @@ Future<void> _fetchUserProfileInBackground() async {
     }
   }
 
+  // ========== Google Sign-In ==========
+  Future<bool> continueWithGoogle() async {
+    state = state.copyWith(isLoading: true, clearError: true);
+    try {
+      final googleSignIn = GoogleSignIn(
+        // استخدام Web Client ID من المستخدم كقيمة افتراضية
+        serverClientId: const String.fromEnvironment(
+          'GOOGLE_WEB_CLIENT_ID', 
+          defaultValue: '187618233861-6aeqcilg6m0ndtqudurj772t7fn1d668.apps.googleusercontent.com',
+        ),
+      );
+      
+      // لتفعيل اختيار الحساب في كل مرة، نقوم بتسجيل الخروج أولاً
+      await googleSignIn.signOut().catchError((_) => null);
+      
+      final GoogleSignInAccount? googleUser = await googleSignIn.signIn();
+      
+      // إذا ألغى المستخدم عملية التسجيل
+      if (googleUser == null) {
+        state = state.copyWith(isLoading: false);
+        return false;
+      }
+      
+      final GoogleSignInAuthentication googleAuth = await googleUser.authentication;
+      
+      if (googleAuth.idToken == null) {
+        // في حال تم استخدام Android Client ID بالخطأ، سيكون idToken = null
+        state = state.copyWith(
+          isLoading: false, 
+          error: 'فشل الحصول على مصادقة Google. تأكد من إعداد Web Client ID الصحيح.',
+        );
+        return false;
+      }
+      
+      final response = await _authApi.googleSignIn(googleAuth.idToken!);
+      
+      if (response['success'] == true) {
+        final user = UserModel.fromJson(response['user']);
+        state = AuthState(isInitializing: false, isLoading: false, user: user);
+        _saveUserToCache(user);
+        debugPrint('✅ تسجيل دخول بواسطة Google ناجح للمستخدم: \${user.email}');
+        return true;
+      } else {
+        state = AuthState(
+          isInitializing: false,
+          isLoading: false,
+          error: response['message'] ?? 'فشل تسجيل الدخول باستخدام حساب Google',
+        );
+        return false;
+      }
+    } catch (e) {
+      debugPrint('Google Login exception: $e');
+      state = AuthState(
+        isInitializing: false, 
+        isLoading: false, 
+        error: 'حدث خطأ أثناء محاولة الاتصال بخدمات Google',
+      );
+      return false;
+    }
+  }
+
   // ✅ دوال الزائر (Guest Mode)
 Future<void> loginAsGuest() async {
   state = state.copyWith(isLoading: true);
+  
+  final guestScansStr = await _secureStorage.read(key: _kGuestScansCount);
+  final guestScans = int.tryParse(guestScansStr ?? '0') ?? 0;
+  
+  await _secureStorage.write(key: _kIsGuest, value: 'true');
   
   await Future.delayed(const Duration(milliseconds: 500));
   
@@ -361,10 +456,10 @@ Future<void> loginAsGuest() async {
     isInitializing: false,
     isLoading: false,
     isGuest: true,
-    guestScansCount: 0,
+    guestScansCount: guestScans,
   );
   
-  debugPrint('👤 دخول كزائر بنجاح');
+  debugPrint('👤 دخول كزائر بنجاح (فحوصات سابقة: $guestScans)');
 }
 
 Future<void> incrementGuestScanCount() async {
@@ -372,11 +467,16 @@ Future<void> incrementGuestScanCount() async {
   
   final newCount = state.guestScansCount + 1;
   
+  await _secureStorage.write(
+    key: _kGuestScansCount,
+    value: newCount.toString(),
+  );
+  
   state = state.copyWith(
     guestScansCount: newCount,
   );
   
-  debugPrint('📊 عدد فحوصات الزائر: $newCount/3');
+  debugPrint('📊 عدد فحوصات الزائر المحفوظ: $newCount/3');
 }
 
 bool canGuestScan() {
@@ -389,6 +489,8 @@ int getRemainingGuestScans() {
 }
 
 Future<void> logoutGuest() async {
+  await _secureStorage.delete(key: _kIsGuest);
+  
   state = AuthState(
     isInitializing: false,
     isLoading: false,

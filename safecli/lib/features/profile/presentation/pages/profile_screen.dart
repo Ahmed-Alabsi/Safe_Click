@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:safeclik/features/auth/presentation/providers/auth_controller.dart';
 import 'package:safeclik/features/scan/presentation/controllers/scan_notifier.dart';
@@ -24,7 +24,8 @@ class ProfileScreen extends ConsumerWidget {
                 : _buildNotLoggedInState(context, theme))
             : RefreshIndicator(
                 onRefresh: () async {
-                  ref.invalidate(authProvider);
+                  await ref.read(authProvider.notifier).refreshProfile();
+                  await ref.read(scanNotifierProvider.notifier).refreshHistory();
                 },
                 color: theme.colorScheme.primary,
                 backgroundColor: theme.colorScheme.surface,

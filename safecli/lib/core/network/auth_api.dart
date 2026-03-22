@@ -141,6 +141,36 @@ class AuthApi {
     }
   }
 
+  /// تسجيل الدخول عبر Google
+  Future<Map<String, dynamic>> googleSignIn(String idToken) async {
+    try {
+      final response = await _client.dio.post('/auth/google/', data: {
+        'id_token': idToken,
+      });
+      final data = response.data;
+      
+      if (response.statusCode == 200 && data['success'] == true) {
+        final access = data['tokens']['access'] as String?;
+        final refresh = data['tokens']['refresh'] as String?;
+        
+        if (access != null) {
+          await _secureStorage.write(key: 'access_token', value: access);
+          _client.cacheToken(access);
+        }
+        if (refresh != null) {
+          await _secureStorage.write(key: 'refresh_token', value: refresh);
+        }
+      }
+      return data;
+    } catch (e) {
+      if (e is DioException && e.response != null) {
+        final errorData = e.response!.data;
+        return {'success': false, 'message': errorData['message'] ?? 'فشل تسجيل الدخول باستخدام حساب Google'};
+      }
+      return _client.handleDioError(e);
+    }
+  }
+
   // ========== الملف الشخصي ==========
 
   /// جلب بيانات الملف الشخصي

@@ -1,7 +1,8 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:safeclik/features/auth/presentation/providers/auth_controller.dart';
 import 'package:safeclik/features/auth/presentation/pages/verify_email_screen.dart';
+import 'package:safeclik/features/main/presentation/pages/home_screen.dart';
 
 class RegisterScreen extends ConsumerStatefulWidget {
   const RegisterScreen({super.key});
@@ -269,6 +270,10 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen>
               _buildTermsCheckbox(context),
               const SizedBox(height: 24),
               _buildRegisterButton(context),
+              const SizedBox(height: 24),
+              _buildDivider(context),
+              const SizedBox(height: 24),
+              _buildGoogleButton(context),
             ],
           ),
         ),
@@ -719,6 +724,93 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen>
                     Icon(Icons.arrow_forward_rounded, size: 20),
                   ],
                 ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDivider(BuildContext context) {
+    return Row(
+      children: [
+        Expanded(child: Divider(color: Theme.of(context).colorScheme.outlineVariant)),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          child: Text(
+            'أو',
+            style: TextStyle(
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ),
+        Expanded(child: Divider(color: Theme.of(context).colorScheme.outlineVariant)),
+      ],
+    );
+  }
+
+  Widget _buildGoogleButton(BuildContext context) {
+    final authState = ref.watch(authProvider);
+    final isSubmitting = authState.isLoading;
+
+    return SizedBox(
+      height: 56,
+      child: OutlinedButton(
+        onPressed: isSubmitting ? null : () async {
+          final notifier = ref.read(authProvider.notifier);
+          final success = await notifier.continueWithGoogle();
+          if (success) {
+            if (!context.mounted) return;
+            Navigator.of(context).pushAndRemoveUntil(
+              MaterialPageRoute(builder: (context) => const HomeScreen()),
+              (route) => false,
+            );
+          } else if (notifier.error != null) {
+            if (!context.mounted) return;
+            ScaffoldMessenger.of(context).clearSnackBars();
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Row(
+                  children: [
+                    Icon(Icons.error_outline, color: Theme.of(context).colorScheme.onError),
+                    const SizedBox(width: 12),
+                    Expanded(child: Text(notifier.error!)),
+                  ],
+                ),
+                backgroundColor: Theme.of(context).colorScheme.error,
+                behavior: SnackBarBehavior.floating,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                margin: const EdgeInsets.all(16),
+              ),
+            );
+          }
+        },
+        style: OutlinedButton.styleFrom(
+          side: BorderSide(color: Theme.of(context).colorScheme.outlineVariant),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Text(
+              'G',
+              style: TextStyle(
+                fontSize: 24,
+                fontWeight: FontWeight.bold,
+                color: Theme.of(context).colorScheme.primary,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Text(
+              'المتابعة باستخدام Google',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+                color: Theme.of(context).colorScheme.onSurface,
+              ),
+            ),
+          ],
         ),
       ),
     );

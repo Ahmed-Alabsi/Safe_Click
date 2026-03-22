@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:safeclik/features/settings/presentation/providers/settings_controller.dart';
 import 'package:safeclik/features/settings/data/models/settings_model.dart';
@@ -133,6 +134,13 @@ class SettingsScreen extends ConsumerWidget {
           value: settings.autoScan,
           icon: Icons.auto_awesome_rounded,
           onChanged: (value) => notifier.toggleAutoScan(value),
+        ),
+        _buildActionTile(
+          context,
+          title: 'تفعيل اعتراض الروابط',
+          icon: Icons.shield_rounded,
+          iconColor: Theme.of(context).colorScheme.primary,
+          onTap: () => _showLinkInterceptionSetup(context),
         ),
         _buildLanguageTile(context, settings, notifier),
       ],
@@ -592,6 +600,76 @@ class SettingsScreen extends ConsumerWidget {
     return ListTile(
       leading: Icon(icon, color: Theme.of(context).colorScheme.onSurfaceVariant),
       title: Text(title), trailing: Text(value),
+    );
+  }
+
+  // 🛡️ حوار إعداد اعتراض الروابط
+  void _showLinkInterceptionSetup(BuildContext context) {
+    const platform = MethodChannel('com.example.safecli/app');
+    final theme = Theme.of(context);
+    
+    showDialog(
+      context: context,
+      builder: (context) => Dialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 72,
+                height: 72,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: theme.colorScheme.primary.withValues(alpha: 0.15),
+                ),
+                child: Icon(Icons.shield_rounded, size: 40, color: theme.colorScheme.primary),
+              ),
+              const SizedBox(height: 16),
+              Text(
+                'تفعيل اعتراض الروابط',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: theme.colorScheme.primary),
+              ),
+              const SizedBox(height: 12),
+              Text(
+                'لتفعيل اعتراض الروابط تلقائياً، يجب:\n\n'
+                '1. الضغط على "فتح الإعدادات" أدناه\n'
+                '2. تفعيل "فتح الروابط المدعومة"\n'
+                '3. اختيار "الفتح دائماً"\n'
+                '4. تفعيل جميع الروابط المتاحة',
+                style: TextStyle(fontSize: 14, color: theme.colorScheme.onSurfaceVariant, height: 1.5),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 20),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  onPressed: () async {
+                    try {
+                      await platform.invokeMethod('openDefaultAppsSettings');
+                    } catch (e) {
+                      debugPrint('❌ خطأ في فتح الإعدادات: $e');
+                    }
+                    if (context.mounted) Navigator.pop(context);
+                  },
+                  icon: const Icon(Icons.settings, size: 18),
+                  label: const Text('فتح الإعدادات'),
+                  style: ElevatedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 10),
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('لاحقاً'),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 
