@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:safeclik/core/network/api_client.dart';
@@ -114,15 +114,15 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
 
     return Scaffold(
       body: Container(
-        width: size.width,
-        height: size.height,
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [
-              Theme.of(context).colorScheme.tertiary,
-              Theme.of(context).colorScheme.tertiaryContainer,
+      width: size.width,
+      height: size.height,
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,    // يبدأ من الأعلى
+          end: Alignment.bottomCenter,    // ينتهي في الأسفل
+          colors: [
+            Theme.of(context).colorScheme.tertiaryContainer,  // فاتح في الأعلى
+            Theme.of(context).colorScheme.tertiary,          // غامق في الأسفل
             ],
           ),
         ),
