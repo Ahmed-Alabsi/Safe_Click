@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:safeclik/features/settings/presentation/providers/settings_controller.dart';
@@ -567,7 +567,7 @@ class SettingsScreen extends ConsumerWidget {
             const SizedBox(height: 20),
             _buildSupportTile(context, Icons.phone, 'رقم الهاتف', '+966 11 234 5678', () => _launchURL('tel:+966112345678')),
             _buildSupportTile(context, Icons.chat, 'واتساب', '+967 775 309 277', () => _launchURL('https://wa.me/967775309277')),
-            _buildSupportTile(context, Icons.email, 'البريد الإلكتروني', 'support@safeclik.com', () => _launchURL('mailto:support@safeclik.com')),
+            _buildSupportTile(context, Icons.email, 'البريد الإلكتروني', 'SafeClick@gmail.com', () => _launchURL('mailto:safeclick17@gmail.com')),
           ],
         ),
       ),
