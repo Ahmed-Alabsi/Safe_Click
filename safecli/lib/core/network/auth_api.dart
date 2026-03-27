@@ -89,7 +89,7 @@ class AuthApi {
     }
   }
 
-  /// تسجيل الدخول
+  /// تسجيل الدخول (باسم المستخدم)
   Future<Map<String, dynamic>> login({
     required String username,
     required String password,
@@ -119,6 +119,41 @@ class AuthApi {
       if (e is DioException && e.response != null) {
         final errorData = e.response!.data;
         return {'success': false, 'message': errorData['message'] ?? 'اسم المستخدم أو كلمة المرور غير صحيحة'};
+      }
+      return _client.handleDioError(e);
+    }
+  }
+
+  /// ✅ تسجيل الدخول بالبريد الإلكتروني (جديد)
+  Future<Map<String, dynamic>> loginWithEmail({
+    required String email,
+    required String password,
+  }) async {
+    try {
+      final response = await _client.dio.post('/auth/login/', data: {
+        'email': email,
+        'password': password,
+      });
+      final data = response.data;
+      
+      if (response.statusCode == 200 && data['success'] == true) {
+        final access = data['tokens']['access'] as String?;
+        final refresh = data['tokens']['refresh'] as String?;
+        
+        if (access != null) {
+          await _secureStorage.write(key: 'access_token', value: access);
+          _client.cacheToken(access);
+        }
+        if (refresh != null) {
+          await _secureStorage.write(key: 'refresh_token', value: refresh);
+        }
+        return data;
+      }
+      return data;
+    } catch (e) {
+      if (e is DioException && e.response != null) {
+        final errorData = e.response!.data;
+        return {'success': false, 'message': errorData['message'] ?? 'البريد الإلكتروني أو كلمة المرور غير صحيحة'};
       }
       return _client.handleDioError(e);
     }

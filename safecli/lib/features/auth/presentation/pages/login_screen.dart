@@ -81,6 +81,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
     );
   }
 
+  /// ✅ دالة تسجيل الدخول المعدلة لدعم الاسم أو البريد الإلكتروني
   Future<void> _login(BuildContext context) async {
     if (ref.read(authProvider).isLoading) return;
 
@@ -89,11 +90,24 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
     if (_formKey.currentState!.validate()) {
       FocusScope.of(context).unfocus();
 
-      final success = await notifier.login(
-        _usernameController.text.trim(),
-        _passwordController.text,
-      );
+      final usernameOrEmail = _usernameController.text.trim();
+      final password = _passwordController.text;
 
+      // التحقق مما إذا كان المدخل بريدًا إلكترونيًا
+      final isEmail = usernameOrEmail.contains('@') && usernameOrEmail.contains('.');
+      
+      bool success;
+      
+      if (isEmail) {
+        // تسجيل الدخول بالبريد الإلكتروني
+        debugPrint('📧 محاولة تسجيل الدخول بالبريد الإلكتروني: $usernameOrEmail');
+        success = await notifier.loginWithEmail(usernameOrEmail, password);
+      } else {
+        // تسجيل الدخول باسم المستخدم
+        debugPrint('👤 محاولة تسجيل الدخول باسم المستخدم: $usernameOrEmail');
+        success = await notifier.login(usernameOrEmail, password);
+      }
+      
       if (success) {
         if (!context.mounted) return;
         Navigator.of(context).pushAndRemoveUntil(
@@ -114,15 +128,15 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
 
     return Scaffold(
       body: Container(
-      width: size.width,
-      height: size.height,
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topCenter,    // يبدأ من الأعلى
-          end: Alignment.bottomCenter,    // ينتهي في الأسفل
-          colors: [
-            Theme.of(context).colorScheme.tertiaryContainer,  // فاتح في الأعلى
-            Theme.of(context).colorScheme.tertiary,          // غامق في الأسفل
+        width: size.width,
+        height: size.height,
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [
+              Theme.of(context).colorScheme.tertiaryContainer,
+              Theme.of(context).colorScheme.tertiary,
             ],
           ),
         ),
@@ -413,13 +427,15 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
     );
   }
 
+  /// ✅ حقل اسم المستخدم/البريد الإلكتروني المعدل
   Widget _buildUsernameField(BuildContext context) {
     return TextFormField(
       controller: _usernameController,
       keyboardType: TextInputType.text,
+      textInputAction: TextInputAction.next,
       decoration: InputDecoration(
-        labelText: 'الاسم الكامل',
-        hintText: 'أدخل اسم المستخدم',
+        labelText: 'اسم المستخدم أو البريد الإلكتروني',
+        hintText: 'أدخل اسم المستخدم أو البريد الإلكتروني',
         prefixIcon: Container(
           margin: const EdgeInsets.all(8),
           decoration: BoxDecoration(
@@ -470,10 +486,17 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
       ),
       validator: (value) {
         if (value == null || value.isEmpty) {
-          return 'يرجى إدخال اسم المستخدم';
+          return 'يرجى إدخال اسم المستخدم أو البريد الإلكتروني';
         }
         if (value.length < 3) {
-          return 'الاسم يجب أن يكون 3 أحرف على الأقل';
+          return 'الاسم أو البريد الإلكتروني يجب أن يكون 3 أحرف على الأقل';
+        }
+        // التحقق من صحة البريد الإلكتروني إذا كان المدخل يحتوي على @
+        if (value.contains('@')) {
+          final emailRegex = RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$');
+          if (!emailRegex.hasMatch(value)) {
+            return 'يرجى إدخال بريد إلكتروني صحيح';
+          }
         }
         return null;
       },
@@ -485,6 +508,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
       controller: _passwordController,
       obscureText: _obscurePassword,
       textDirection: TextDirection.ltr,
+      textInputAction: TextInputAction.done,
+      onFieldSubmitted: (_) => _login(context),
       decoration: InputDecoration(
         labelText: 'كلمة المرور',
         hintText: '********',
@@ -566,25 +591,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        // يمكنك تفعيل "تذكرني" لاحقاً إذا أردت
-        // Row(
-        //   children: [
-        //     Checkbox(
-        //       value: _rememberMe,
-        //       activeColor: Theme.of(context).colorScheme.primary,
-        //       shape: RoundedRectangleBorder(
-        //         borderRadius: BorderRadius.circular(6),
-        //       ),
-        //       side: BorderSide(
-        //         color: Theme.of(context).colorScheme.primary,
-        //         width: 1.5,
-        //       ),
-        //       onChanged: (value) => setState(() => _rememberMe = value ?? false),
-        //     ),
-        //     const Text('تذكرني'),
-        //   ],
-        // ),
-        const SizedBox(), // مكان للـ checkbox إذا أردت إضافته مستقبلاً
+        const SizedBox(),
         Container(
           decoration: BoxDecoration(
             color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.05),
@@ -703,7 +710,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
     return SizedBox(
       height: 56,
       child: OutlinedButton(
-        // استخدام same logic كما في login button
         onPressed: isSubmitting ? null : () async {
           final notifier = ref.read(authProvider.notifier);
           final success = await notifier.continueWithGoogle();
@@ -727,7 +733,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            // أيقونة جوجل بسيطة (يمكن استخدام صورة إذا توفرت، سنستخدم أيقونة ملونة إذا أمكن أو نص)
             Text(
               'G',
               style: TextStyle(

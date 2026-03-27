@@ -19,7 +19,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen>
   final List<OnboardingItem> _onboardingItems = [
     OnboardingItem(
       title: 'فحص الروابط بذكاء',
-      description: 'اكتشف الروابط الضارة والتصيد الاحتيالي قبل النقر عليها',
+      description: 'اكتشف الروابط الضارة والتصيد الاحتيالي قبل الدخول عليها',
       icon: Icons.search_rounded,
       color: Color(0xFF4CAF50),
       gradientColors: [Color(0xFF4CAF50), Color(0xFF8BC34A)],

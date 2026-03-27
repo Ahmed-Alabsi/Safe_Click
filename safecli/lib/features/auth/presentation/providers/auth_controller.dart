@@ -1,4 +1,4 @@
-import 'dart:async';
+﻿import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -38,10 +38,9 @@ class AuthNotifier extends StateNotifier<AuthState> {
 
   // حفظ التوكنات في التخزين الآمن
   Future<void> _saveTokens(String accessToken, String refreshToken) async {
-  // استخدام ApiClient لحفظ التوكنات
-  await sl<ApiClient>().saveTokens(accessToken, refreshToken);
-  debugPrint('✅ تم حفظ التوكنات بنجاح');
-}
+    await sl<ApiClient>().saveTokens(accessToken, refreshToken);
+    debugPrint('✅ تم حفظ التوكنات بنجاح');
+  }
 
   Future<void> _loadSavedUser() async {
     int guestScans = 0;
@@ -76,9 +75,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
           guestScansCount: guestScans,
         );
         
-        // محاولة جلب بيانات المستخدم في الخلفية لتحديث الكاش
         _fetchUserProfileInBackground();
-        
         return;
       }
     } catch (e) {
@@ -97,7 +94,6 @@ class AuthNotifier extends StateNotifier<AuthState> {
     }
   }
 
-  // حفظ بيانات المستخدم في التخزين الآمن
   Future<void> _saveUserToCache(UserModel user) async {
     try {
       await _secureStorage.write(
@@ -110,31 +106,25 @@ class AuthNotifier extends StateNotifier<AuthState> {
     }
   }
 
-// جلب بيانات المستخدم وتحديث الكاش
-Future<void> refreshProfile() async {
-  await _fetchUserProfileInBackground();
-}
-
-// جلب بيانات المستخدم في الخلفية
-Future<void> _fetchUserProfileInBackground() async {
-  try {
-    final response = await _authApi.getProfile();
-    if (response['success'] == true && response.containsKey('user')) {
-      final user = UserModel.fromJson(response['user']);
-      // تحديث state ببيانات المستخدم إذا وصلت
-      state = state.copyWith(
-        user: user,
-        hasToken: true,
-      );
-      // تحديث الكاش المحلي
-      _saveUserToCache(user);
-    }
-  } catch (e) {
-    // إذا فشل جلب البيانات، نبقى على hasToken = true
-    debugPrint('⚠️ فشل جلب بيانات المستخدم: $e');
+  Future<void> refreshProfile() async {
+    await _fetchUserProfileInBackground();
   }
-}
 
+  Future<void> _fetchUserProfileInBackground() async {
+    try {
+      final response = await _authApi.getProfile();
+      if (response['success'] == true && response.containsKey('user')) {
+        final user = UserModel.fromJson(response['user']);
+        state = state.copyWith(
+          user: user,
+          hasToken: true,
+        );
+        _saveUserToCache(user);
+      }
+    } catch (e) {
+      debugPrint('⚠️ فشل جلب بيانات المستخدم: $e');
+    }
+  }
 
   Future<void> _clearTokens() async {
     await sl<ApiClient>().clearTokens();
@@ -146,55 +136,205 @@ Future<void> _fetchUserProfileInBackground() async {
 
   // ── Public API ────────────────────────────────────────────────────────────
 
-  Future<bool> login(String username, String password) async {
-    if (state.isInitializing && state.user == null && state.error == null) return false;
+  // ✅ تسجيل الدخول باسم المستخدم (مع معالجة صحيحة للرسائل)
+Future<bool> login(String username, String password) async {
+  if (state.isInitializing && state.user == null && state.error == null) return false;
+  
+  state = state.copyWith(isLoading: true, clearError: true);
+
+  try {
+    final response = await _authApi.login(username: username, password: password);
+    debugPrint('📥 استجابة تسجيل الدخول: $response');
     
-    state = state.copyWith(isLoading: true, clearError: true);
-
-    try {
-      final response = await _authApi.login(username: username, password: password);
-      debugPrint('📥 استجابة تسجيل الدخول: $response');
+    if (response['success'] == true) {
+      final data = response['data'] as Map<String, dynamic>?;
+      final tokens = data?['tokens'] ?? response['tokens'];
       
-      if (response['success'] == true) {
-        // استخراج التوكنات من الاستجابة
-        final data = response['data'] as Map<String, dynamic>?;
-        final tokens = data?['tokens'] as Map<String, dynamic>?;
+      if (tokens != null) {
+        final accessToken = tokens['access'];
+        final refreshToken = tokens['refresh'];
         
-        if (tokens != null) {
-          final accessToken = tokens['access'];
-          final refreshToken = tokens['refresh'];
-          
-          if (accessToken != null && refreshToken != null) {
-            // حفظ التوكنات
-            await _saveTokens(accessToken, refreshToken);
-          }
+        if (accessToken != null && refreshToken != null) {
+          await _saveTokens(accessToken, refreshToken);
         }
-        
-        final user = UserModel.fromJson(response['user'] ?? data?['user']);
-        state = AuthState(isInitializing: false, isLoading: false, user: user);
-        _saveUserToCache(user);
-        debugPrint('✅ تسجيل دخول ناجح للمستخدم: ${user.email}');
-        return true;
-      } else {
-        state = AuthState(
-          isInitializing: false,
-          isLoading: false,
-          error: response['message'] ?? 'البريد الإلكتروني أو كلمة المرور غير صحيحة',
-        );
-        return false;
       }
-    } catch (e) {
-      debugPrint('❌ Login exception: $e');
-      final errorData = sl<ApiClient>().handleDioError(e);
+      
+      final user = UserModel.fromJson(response['user'] ?? data?['user']);
+      state = AuthState(isInitializing: false, isLoading: false, user: user);
+      _saveUserToCache(user);
+      debugPrint('✅ تسجيل دخول ناجح للمستخدم: ${user.email}');
+      return true;
+    } else {
+      // ✅ معالجة رسالة الخطأ بشكل صحيح
+      String errorMessage = 'اسم المستخدم أو كلمة المرور غير صحيحة';
+      
+      if (response['message'] != null) {
+        final message = response['message'];
+        
+        if (message is Map<String, dynamic>) {
+          if (message.containsKey('non_field_errors')) {
+            final errors = message['non_field_errors'];
+            if (errors is List && errors.isNotEmpty) {
+              errorMessage = errors[0].toString();
+            }
+          } else if (message.containsKey('username')) {
+            final errors = message['username'];
+            if (errors is List && errors.isNotEmpty) {
+              errorMessage = errors[0].toString();
+            }
+          } else if (message.containsKey('password')) {
+            final errors = message['password'];
+            if (errors is List && errors.isNotEmpty) {
+              errorMessage = errors[0].toString();
+            }
+          } else {
+            final firstValue = message.values.first;
+            if (firstValue is List && firstValue.isNotEmpty) {
+              errorMessage = firstValue[0].toString();
+            } else if (firstValue is String) {
+              errorMessage = firstValue;
+            }
+          }
+        } else if (message is String) {
+          errorMessage = message;
+        }
+      }
+      
       state = AuthState(
-        isInitializing: false, 
-        isLoading: false, 
-        error: errorData['message'],
+        isInitializing: false,
+        isLoading: false,
+        error: errorMessage,
       );
+      return false;
     }
-    return false;
+  } catch (e) {
+    debugPrint('❌ Login exception: $e');
+    final errorData = sl<ApiClient>().handleDioError(e);
+    
+    String errorMessage = errorData['message'] ?? 'حدث خطأ غير متوقع';
+    
+    if (errorData['message'] is Map) {
+      final messageMap = errorData['message'] as Map;
+      final firstValue = messageMap.values.first;
+      if (firstValue is List && firstValue.isNotEmpty) {
+        errorMessage = firstValue[0].toString();
+      }
+    }
+    
+    state = AuthState(
+      isInitializing: false, 
+      isLoading: false, 
+      error: errorMessage,
+    );
   }
+  return false;
+}
 
+ // ✅ تسجيل الدخول بالبريد الإلكتروني (مع معالجة صحيحة للرسائل)
+Future<bool> loginWithEmail(String email, String password) async {
+  if (state.isInitializing && state.user == null && state.error == null) return false;
+  
+  state = state.copyWith(isLoading: true, clearError: true);
+
+  try {
+    final response = await _authApi.loginWithEmail(email: email, password: password);
+    debugPrint('📥 استجابة تسجيل الدخول بالبريد الإلكتروني: $response');
+    
+    if (response['success'] == true) {
+      final tokens = response['tokens'];
+      
+      if (tokens != null) {
+        final accessToken = tokens['access'];
+        final refreshToken = tokens['refresh'];
+        
+        if (accessToken != null && refreshToken != null) {
+          await _saveTokens(accessToken, refreshToken);
+        }
+      }
+      
+      final user = UserModel.fromJson(response['user']);
+      state = AuthState(isInitializing: false, isLoading: false, user: user);
+      _saveUserToCache(user);
+      debugPrint('✅ تسجيل دخول ناجح للمستخدم: ${user.email}');
+      return true;
+    } else {
+      // ✅ معالجة رسالة الخطأ بشكل صحيح
+      String errorMessage = 'البريد الإلكتروني أو كلمة المرور غير صحيحة';
+      
+      if (response['message'] != null) {
+        final message = response['message'];
+        
+        // إذا كانت الرسالة عبارة عن Map (مثل أخطاء serializer)
+        if (message is Map<String, dynamic>) {
+          // محاولة استخراج أول خطأ
+          if (message.containsKey('non_field_errors')) {
+            final errors = message['non_field_errors'];
+            if (errors is List && errors.isNotEmpty) {
+              errorMessage = errors[0].toString();
+            }
+          } else if (message.containsKey('email')) {
+            final errors = message['email'];
+            if (errors is List && errors.isNotEmpty) {
+              errorMessage = errors[0].toString();
+            }
+          } else if (message.containsKey('username')) {
+            final errors = message['username'];
+            if (errors is List && errors.isNotEmpty) {
+              errorMessage = errors[0].toString();
+            }
+          } else if (message.containsKey('password')) {
+            final errors = message['password'];
+            if (errors is List && errors.isNotEmpty) {
+              errorMessage = errors[0].toString();
+            }
+          } else {
+            // محاولة استخراج أي قيمة من الـ Map
+            final firstValue = message.values.first;
+            if (firstValue is List && firstValue.isNotEmpty) {
+              errorMessage = firstValue[0].toString();
+            } else if (firstValue is String) {
+              errorMessage = firstValue;
+            }
+          }
+        } 
+        // إذا كانت الرسالة عبارة عن String
+        else if (message is String) {
+          errorMessage = message;
+        }
+      }
+      
+      state = AuthState(
+        isInitializing: false,
+        isLoading: false,
+        error: errorMessage,
+      );
+      return false;
+    }
+  } catch (e) {
+    debugPrint('❌ LoginWithEmail exception: $e');
+    final errorData = sl<ApiClient>().handleDioError(e);
+    
+    String errorMessage = errorData['message'] ?? 'حدث خطأ غير متوقع';
+    
+    // إذا كان errorData['message'] هو Map
+    if (errorData['message'] is Map) {
+      final messageMap = errorData['message'] as Map;
+      final firstValue = messageMap.values.first;
+      if (firstValue is List && firstValue.isNotEmpty) {
+        errorMessage = firstValue[0].toString();
+      }
+    }
+    
+    state = AuthState(
+      isInitializing: false, 
+      isLoading: false, 
+      error: errorMessage,
+    );
+  }
+  return false;
+}
+
+  // ✅ تسجيل مستخدم جديد
   Future<bool> register(
     String name,
     String email,
@@ -244,6 +384,7 @@ Future<void> _fetchUserProfileInBackground() async {
     return false;
   }
 
+  // ✅ التحقق من OTP
   Future<bool> verifyOtp(String email, String otp) async {
     state = state.copyWith(isLoading: true, clearError: true);
     
@@ -254,9 +395,7 @@ Future<void> _fetchUserProfileInBackground() async {
       if (response['success'] == true) {
         final data = response['data'] as Map<String, dynamic>?;
         
-        // If tokens and user are in response (Direct Login)
         if (data != null) {
-          // حفظ التوكنات إذا وجدت
           final tokens = data['tokens'] as Map<String, dynamic>?;
           if (tokens != null) {
             final accessToken = tokens['access'];
@@ -266,7 +405,6 @@ Future<void> _fetchUserProfileInBackground() async {
             }
           }
           
-          // حفظ بيانات المستخدم
           if (data['user'] != null) {
             final user = UserModel.fromJson(data['user']);
             state = AuthState(isInitializing: false, isLoading: false, user: user);
@@ -292,6 +430,7 @@ Future<void> _fetchUserProfileInBackground() async {
     }
   }
 
+  // ✅ إعادة إرسال OTP
   Future<bool> resendOtp(String email) async {
     state = state.copyWith(isLoading: true, clearError: true);
     
@@ -315,16 +454,17 @@ Future<void> _fetchUserProfileInBackground() async {
     }
   }
 
+  // ✅ تسجيل الخروج
   Future<void> logout() async {
     try {
-      // تسجيل الخروج من Google إذا كان مسجلاً
       await GoogleSignIn().signOut().catchError((_) => null);
       await _authApi.logout().catchError((_) => <String, dynamic>{});
     } finally {
-      await _clearTokens(); // هذه الدالة تمسح التوكنات من التخزين
+      await _clearTokens();
     }
   }
 
+  // ✅ التحقق من OTP لإعادة تعيين كلمة المرور
   Future<bool> verifyResetOtp(String email, String otp) async {
     state = state.copyWith(isLoading: true, clearError: true);
     try {
@@ -340,6 +480,7 @@ Future<void> _fetchUserProfileInBackground() async {
     }
   }
 
+  // ✅ طلب إعادة تعيين كلمة المرور
   Future<bool> forgotPassword(String email) async {
     state = state.copyWith(isLoading: true, clearError: true);
     try {
@@ -356,6 +497,7 @@ Future<void> _fetchUserProfileInBackground() async {
     }
   }
 
+  // ✅ تأكيد إعادة تعيين كلمة المرور
   Future<bool> confirmResetPassword({
     required String email,
     required String otp,
@@ -380,24 +522,21 @@ Future<void> _fetchUserProfileInBackground() async {
     }
   }
 
-  // ========== Google Sign-In ==========
+  // ✅ تسجيل الدخول بجوجل
   Future<bool> continueWithGoogle() async {
     state = state.copyWith(isLoading: true, clearError: true);
     try {
       final googleSignIn = GoogleSignIn(
-        // استخدام Web Client ID من المستخدم كقيمة افتراضية
         serverClientId: const String.fromEnvironment(
           'GOOGLE_WEB_CLIENT_ID', 
           defaultValue: '187618233861-6aeqcilg6m0ndtqudurj772t7fn1d668.apps.googleusercontent.com',
         ),
       );
       
-      // لتفعيل اختيار الحساب في كل مرة، نقوم بتسجيل الخروج أولاً
       await googleSignIn.signOut().catchError((_) => null);
       
       final GoogleSignInAccount? googleUser = await googleSignIn.signIn();
       
-      // إذا ألغى المستخدم عملية التسجيل
       if (googleUser == null) {
         state = state.copyWith(isLoading: false);
         return false;
@@ -406,7 +545,6 @@ Future<void> _fetchUserProfileInBackground() async {
       final GoogleSignInAuthentication googleAuth = await googleUser.authentication;
       
       if (googleAuth.idToken == null) {
-        // في حال تم استخدام Android Client ID بالخطأ، سيكون idToken = null
         state = state.copyWith(
           isLoading: false, 
           error: 'فشل الحصول على مصادقة Google. تأكد من إعداد Web Client ID الصحيح.',
@@ -420,7 +558,7 @@ Future<void> _fetchUserProfileInBackground() async {
         final user = UserModel.fromJson(response['user']);
         state = AuthState(isInitializing: false, isLoading: false, user: user);
         _saveUserToCache(user);
-        debugPrint('✅ تسجيل دخول بواسطة Google ناجح للمستخدم: \${user.email}');
+        debugPrint('✅ تسجيل دخول بواسطة Google ناجح للمستخدم: ${user.email}');
         return true;
       } else {
         state = AuthState(
@@ -442,71 +580,71 @@ Future<void> _fetchUserProfileInBackground() async {
   }
 
   // ✅ دوال الزائر (Guest Mode)
-Future<void> loginAsGuest() async {
-  state = state.copyWith(isLoading: true);
-  
-  final guestScansStr = await _secureStorage.read(key: _kGuestScansCount);
-  final guestScans = int.tryParse(guestScansStr ?? '0') ?? 0;
-  
-  await _secureStorage.write(key: _kIsGuest, value: 'true');
-  
-  await Future.delayed(const Duration(milliseconds: 500));
-  
-  state = AuthState(
-    isInitializing: false,
-    isLoading: false,
-    isGuest: true,
-    guestScansCount: guestScans,
-  );
-  
-  debugPrint('👤 دخول كزائر بنجاح (فحوصات سابقة: $guestScans)');
-}
+  Future<void> loginAsGuest() async {
+    state = state.copyWith(isLoading: true);
+    
+    final guestScansStr = await _secureStorage.read(key: _kGuestScansCount);
+    final guestScans = int.tryParse(guestScansStr ?? '0') ?? 0;
+    
+    await _secureStorage.write(key: _kIsGuest, value: 'true');
+    
+    await Future.delayed(const Duration(milliseconds: 500));
+    
+    state = AuthState(
+      isInitializing: false,
+      isLoading: false,
+      isGuest: true,
+      guestScansCount: guestScans,
+    );
+    
+    debugPrint('👤 دخول كزائر بنجاح (فحوصات سابقة: $guestScans)');
+  }
 
-Future<void> incrementGuestScanCount() async {
-  if (!state.isGuest) return;
-  
-  final newCount = state.guestScansCount + 1;
-  
-  await _secureStorage.write(
-    key: _kGuestScansCount,
-    value: newCount.toString(),
-  );
-  
-  state = state.copyWith(
-    guestScansCount: newCount,
-  );
-  
-  debugPrint('📊 عدد فحوصات الزائر المحفوظ: $newCount/3');
-}
+  Future<void> incrementGuestScanCount() async {
+    if (!state.isGuest) return;
+    
+    final newCount = state.guestScansCount + 1;
+    
+    await _secureStorage.write(
+      key: _kGuestScansCount,
+      value: newCount.toString(),
+    );
+    
+    state = state.copyWith(
+      guestScansCount: newCount,
+    );
+    
+    debugPrint('📊 عدد فحوصات الزائر المحفوظ: $newCount/3');
+  }
 
-bool canGuestScan() {
-  return state.isGuest && state.guestScansCount < 3;
-}
+  bool canGuestScan() {
+    return state.isGuest && state.guestScansCount < 3;
+  }
 
-int getRemainingGuestScans() {
-  if (!state.isGuest) return 0;
-  return 3 - state.guestScansCount;
-}
+  int getRemainingGuestScans() {
+    if (!state.isGuest) return 0;
+    return 3 - state.guestScansCount;
+  }
 
-Future<void> logoutGuest() async {
-  await _secureStorage.delete(key: _kIsGuest);
-  
-  state = AuthState(
-    isInitializing: false,
-    isLoading: false,
-    isGuest: false,
-    guestScansCount: 0,
-  );
-  
-  debugPrint('👋 تسجيل خروج الزائر');
-}
+  Future<void> logoutGuest() async {
+    await _secureStorage.delete(key: _kIsGuest);
+    
+    state = AuthState(
+      isInitializing: false,
+      isLoading: false,
+      isGuest: false,
+      guestScansCount: 0,
+    );
+    
+    debugPrint('👋 تسجيل خروج الزائر');
+  }
 
+  // ✅ تحديث الملف الشخصي
   Future<bool> updateProfile({String? name, String? imagePath}) async {
     state = state.copyWith(isLoading: true, clearError: true);
     try {
       final response = await _authApi.updateProfile(name: name, imagePath: imagePath);
       
-      // الخادم يرجع بيانات المستخدم مباشرة أو تحت مفتاح 'user'
       UserModel? user;
       if (response['user'] != null) {
         user = UserModel.fromJson(response['user']);
@@ -535,10 +673,10 @@ Future<void> logoutGuest() async {
     }
   }
 
-  // تم دمج تحديث الصورة مع تحديث الملف الشخصي
   @Deprecated('استخدم updateProfile بدلاً من ذلك')
   Future<bool> updateProfileImage(String imagePath) => updateProfile(imagePath: imagePath);
 
+  // ✅ تغيير كلمة المرور
   Future<bool> changePassword({
     required String oldPassword,
     required String newPassword,
